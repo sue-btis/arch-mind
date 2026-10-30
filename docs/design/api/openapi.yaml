@@ -1,0 +1,145 @@
+openapi: 3.1.0
+info:
+  title: arch-mind local API
+  version: 0.1.0
+  description: >
+    JSON API between the Study UI and the local server, served on 127.0.0.1 only.
+    Every request must carry a localhost Host header; requests with a foreign Origin
+    and non-JSON bodies are rejected with 403 or 415 (ADR-005).
+servers:
+  - url: http://127.0.0.1:{port}
+    variables:
+      port:
+        default: "4417"
+        description: Chosen at start; printed by the arch-mind command.
+paths:
+  /api/concepts:
+    get:
+      summary: All valid concepts plus files that could not be read
+      description: Reloads the store folder so hand edits appear (FR-016, FR-017).
+      operationId: listConcepts
+      responses:
+        "200":
+          description: Concepts and problems
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [concepts, problems]
+                properties:
+                  concepts:
+                    type: array
+                    items: { $ref: "#/components/schemas/Concept" }
+                  problems:
+                    type: array
+                    items: { $ref: "#/components/schemas/FileProblem" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/concepts/{id}:
+    get:
+      summary: One concept with the review state of each recall question
+      operationId: getConcept
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, pattern: "^[a-z0-9]+(-[a-z0-9]+)*$" }
+      responses:
+        "200":
+          description: Concept detail (FR-025)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [concept, questions]
+                properties:
+                  concept: { $ref: "#/components/schemas/Concept" }
+                  questions:
+                    type: array
+                    items: { $ref: "#/components/schemas/QuestionState" }
+        "404":
+          description: No such concept
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/facets:
+    get:
+      summary: Facet catalog for the view filters (FR-018)
+      operationId: getFacets
+      responses:
+        "200":
+          description: Layers plus the configured domains and concerns
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [layers, domains, concerns]
+                properties:
+                  layers:
+                    type: array
+                    items: { enum: [client, network, server, data] }
+                  domains: { type: array, items: { type: string } }
+                  concerns: { type: array, items: { type: string } }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/reviews/due:
+    get:
+      summary: Recall questions due today (FR-026)
+      operationId: listDue
+      responses:
+        "200":
+          description: Due questions with their concept id
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/QuestionState" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/reviews:
+    post:
+      summary: Record one review; appends one line to the review log (FR-027 to FR-029, FR-032)
+      operationId: recordReview
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [question, result]
+              properties:
+                question:
+                  type: string
+                  pattern: "^[a-z0-9]+(-[a-z0-9]+)*#q[0-9]+$"
+                result:
+                  enum: [right, wrong]
+      responses:
+        "201":
+          description: Recorded; returns the question's new state
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/QuestionState" }
+        "404":
+          description: No such recall question
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "415":
+          description: Body is not application/json
+components:
+  responses:
+    Forbidden:
+      description: Foreign Host or Origin (ADR-005)
+  schemas:
+    Concept:
+      description: Shape defined in docs/design/data/concept.schema.json.
+      type: object
+    FileProblem:
+      type: object
+      required: [file, reason]
+      properties:
+        file: { type: string }
+        reason: { type: string }
+    QuestionState:
+      type: object
+      required: [question, conceptId, text, box, due]
+      properties:
+        question: { type: string, description: "'<concept id>#<recall question id>'" }
+        conceptId: { type: string }
+        text: { type: string }
+        box: { type: integer, minimum: 1 }
+        due: { type: string, format: date }

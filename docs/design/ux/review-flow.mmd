@@ -1,0 +1,23 @@
+%% Review (J-003): the answer stays hidden until the author has tried to recall it (UX-002).
+sequenceDiagram
+  actor Author
+  participant UI as Study UI
+  participant Srv as Local server
+  participant Log as Review log
+
+  Author->>UI: open review
+  UI->>Srv: GET /api/reviews/due
+  Srv->>Log: replay lines with box intervals
+  Srv-->>UI: due questions
+  loop each due question
+    UI-->>Author: question only
+    Author->>UI: answer from memory, reveal
+    UI-->>Author: SEE-I and relation explanations
+    Author->>UI: right or wrong
+    UI->>Srv: POST /api/reviews
+    Srv->>Log: append one line
+    Srv-->>UI: new box and due date
+    opt wrong
+      UI-->>Author: offer the concept's detail with relations, sources and explanations (FR-031, PD-020)
+    end
+  end

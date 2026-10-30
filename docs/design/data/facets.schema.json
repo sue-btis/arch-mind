@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "arch-mind/facets.schema.json",
+  "title": "Facet catalog",
+  "description": "facets.yaml in the store folder. Layers are fixed by BR-003 and not listed here. Leitner intervals live here until PD-016 is decided.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["domains", "concerns", "leitnerIntervalsDays"],
+  "properties": {
+    "domains": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "concerns": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "leitnerIntervalsDays": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "minItems": 1, "description": "Interval of each box, first box first." }
+  }
+}

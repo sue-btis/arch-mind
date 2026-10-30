@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "arch-mind/capture-tools.schema.json",
+  "title": "Capture server MCP tools",
+  "description": "Contract of the four MCP tools of the capture server (ADR-003). Each entry under $defs.tools gives the tool's inputSchema and outputSchema as published in tools/list. A failed call returns an MCP tool result with isError true and structuredContent matching $defs.rejection (FR-009 to FR-011, UX-003). Relation, episode and SEE-I shapes come from docs/design/data/concept.schema.json.",
+  "$defs": {
+    "conceptId": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+    "relation": { "$ref": "concept.schema.json#/properties/relations/items" },
+    "episode": { "$ref": "concept.schema.json#/properties/episodes/items" },
+    "newRecall": {
+      "description": "A recall question the author confirmed. The server assigns its id and its confirmed date; callers never send them.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["question"],
+      "properties": { "question": { "type": "string", "minLength": 1 } }
+    },
+    "savedRecall": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "confirmed"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^q[0-9]+$" },
+        "confirmed": { "type": "string", "format": "date" }
+      }
+    },
+    "saveResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "file", "recall"],
+      "properties": {
+        "id": { "$ref": "#/$defs/conceptId" },
+        "file": { "type": "string", "description": "Path of the written concept file." },
+        "recall": { "type": "array", "items": { "$ref": "#/$defs/savedRecall" }, "description": "Only the questions added by this call." }
+      }
+    },
+    "rejection": {
+      "description": "structuredContent of a call that saved nothing. Each error names the exact field with a JSON Pointer into the call's arguments (UX-003).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["errors"],
+      "properties": {
+        "errors": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "rule", "message"],
+            "properties": {
+              "path": { "type": "string", "description": "JSON Pointer, e.g. /relations/0/source." },
+              "rule": { "enum": ["missing_source", "missing_target", "duplicate_id", "duplicate_relation", "unknown_concept", "unknown_facet", "incomplete_see_i", "no_recall", "nothing_to_add", "invalid_shape"] },
+              "message": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "tools": {
+      "list_concepts": {
+        "description": "Existing concepts and facet values, so Claude can propose relation targets and facets (FR-002, FR-006).",
+        "inputSchema": { "type": "object", "additionalProperties": false, "properties": {} },
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["concepts", "facets"],
+          "properties": {
+            "concepts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "title", "layer", "domains", "concerns"],
+                "properties": {
+                  "id": { "$ref": "#/$defs/conceptId" },
+                  "title": { "type": "string" },
+                  "layer": { "enum": ["client", "network", "server", "data"] },
+                  "domains": { "type": "array", "items": { "type": "string" } },
+                  "concerns": { "type": "array", "items": { "type": "string" } }
+                }
+              }
+            },
+            "facets": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["domains", "concerns"],
+              "properties": {
+                "domains": { "type": "array", "items": { "type": "string" } },
+                "concerns": { "type": "array", "items": { "type": "string" } }
+              }
+            }
+          }
+        }
+      },
+      "get_concept": {
+        "description": "One stored concept, so a capture can extend it without duplicating what exists (FR-012).",
+        "inputSchema": { "type": "object", "additionalProperties": false, "required": ["id"], "properties": { "id": { "$ref": "#/$defs/conceptId" } } },
+        "outputSchema": { "$ref": "concept.schema.json" },
+        "rejections": ["unknown_concept"]
+      },
+      "save_concept": {
+        "description": "Creates a new concept from what the author confirmed. Rejects without writing when any rule fails (FR-009 to FR-011, BR-001 to BR-005).",
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "title", "layer", "domains", "concerns", "seeI", "relations", "recall"],
+          "properties": {
+            "id": { "$ref": "#/$defs/conceptId" },
+            "title": { "type": "string", "minLength": 1 },
+            "layer": { "enum": ["client", "network", "server", "data"] },
+            "domains": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+            "concerns": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+            "seeI": { "$ref": "concept.schema.json#/properties/seeI" },
+            "relations": { "type": "array", "items": { "$ref": "#/$defs/relation" } },
+            "episodes": { "type": "array", "items": { "$ref": "#/$defs/episode" } },
+            "recall": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/newRecall" } }
+          }
+        },
+        "outputSchema": { "$ref": "#/$defs/saveResult" },
+        "rejections": ["missing_source", "missing_target", "duplicate_id", "duplicate_relation", "unknown_facet", "incomplete_see_i", "no_recall", "invalid_shape"],
+        "assigns": "Recall ids q1, q2, ... in input order; confirmed = the author's local date at save."
+      },
+      "extend_concept": {
+        "description": "Adds relations, recall questions or episodes to an existing concept under the same rules (FR-012). Additive only: never changes or removes stored fields; identity, title, facets and SEE-I change only by hand edit.",
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id"],
+          "minProperties": 2,
+          "properties": {
+            "id": { "$ref": "#/$defs/conceptId" },
+            "relations": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/relation" } },
+            "episodes": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/episode" } },
+            "recall": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/newRecall" } }
+          }
+        },
+        "outputSchema": { "$ref": "#/$defs/saveResult" },
+        "rejections": ["unknown_concept", "missing_source", "missing_target", "duplicate_relation", "nothing_to_add", "invalid_shape"],
+        "assigns": "New recall ids continue after the highest q-number in the stored file; confirmed = the author's local date at save. A relation whose (type, to) already exists is rejected as duplicate_relation."
+      }
+    }
+  }
+}

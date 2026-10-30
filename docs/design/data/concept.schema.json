@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "arch-mind/concept.schema.json",
+  "title": "Concept",
+  "description": "Frontmatter of a concept file plus its SEE-I body, as one object. The capture tools' inputs and outputs are defined in docs/design/api/capture-tools.schema.json. Stored per ADR-002: YAML frontmatter holds every field except seeI; the body holds seeI under the headings '## Statement', '## Elaboration', '## Example', '## Illustration'.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "title", "layer", "domains", "concerns", "seeI", "relations", "recall"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "description": "Immutable after first save (BR-002)." },
+    "title": { "type": "string", "minLength": 1 },
+    "layer": { "enum": ["client", "network", "server", "data"], "description": "Exactly one (BR-003)." },
+    "domains": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true, "description": "Values from the facet catalog." },
+    "concerns": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true, "description": "Values from the facet catalog." },
+    "seeI": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["statement", "elaboration", "example", "illustration"],
+      "properties": {
+        "statement": { "type": "string", "minLength": 1 },
+        "elaboration": { "type": "string", "minLength": 1 },
+        "example": { "type": "string", "minLength": 1 },
+        "illustration": { "type": "string", "minLength": 1 }
+      }
+    },
+    "relations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "to", "source", "explanation"],
+        "properties": {
+          "type": { "type": "string", "minLength": 1 },
+          "to": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "description": "Must be an existing concept id (BR-001); checked by the rules module, not by this schema." },
+          "source": { "type": "string", "minLength": 1 },
+          "explanation": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "episodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["project", "situation"],
+        "properties": {
+          "project": { "type": "string", "minLength": 1 },
+          "situation": { "type": "string", "minLength": 1 },
+          "date": { "type": "string", "format": "date" }
+        }
+      }
+    },
+    "recall": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "question", "confirmed"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^q[0-9]+$", "description": "Stable within the concept; the review log refers to '<concept id>#<id>'. Never reused." },
+          "question": { "type": "string", "minLength": 1 },
+          "confirmed": { "type": "string", "format": "date", "description": "Local calendar day the author confirmed the question; written by capture, never edited. Starting point of the Leitner replay: box 1, due the next day (FR-030)." }
+        }
+      }
+    }
+  }
+}

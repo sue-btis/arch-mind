@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "arch-mind/review-line.schema.json",
+  "title": "Review line",
+  "description": "One line of the append-only review log reviews.jsonl (ADR-002). Lines are never edited or removed (BR-007). Box and due date are computed by replaying the lines in order with the box intervals (BR-006).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["question", "at", "result"],
+  "properties": {
+    "question": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*#q[0-9]+$", "description": "'<concept id>#<recall question id>'." },
+    "at": { "type": "string", "format": "date-time", "description": "When the author marked the answer." },
+    "result": { "enum": ["right", "wrong"] }
+  }
+}

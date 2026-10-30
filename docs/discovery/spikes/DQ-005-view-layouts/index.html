@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DQ-005 view layouts</title>
+<style>
+  :root { --bg:#fbfaf7; --ink:#1d1d1b; --muted:#77736b; --line:#a8a296;
+          --client:#2f6fdf; --network:#1f9d74; --server:#c26a16; --lane:#f1eee7; }
+  body { margin:0; font:14px/1.4 system-ui, sans-serif; background:var(--bg); color:var(--ink); }
+  header { padding:16px 24px 8px; }
+  h1 { font-size:18px; margin:0 0 4px; }
+  p { margin:0; color:var(--muted); max-width:80ch; }
+  nav { display:flex; gap:8px; padding:8px 24px; flex-wrap:wrap; }
+  nav button { border:1px solid var(--line); background:#fff; padding:6px 12px; border-radius:6px; cursor:pointer; }
+  nav button[aria-pressed=true] { background:var(--ink); color:#fff; border-color:var(--ink); }
+  #metric { padding:4px 24px; font-weight:600; }
+  #stage { padding:8px 24px 24px; overflow:auto; }
+  svg text { font-size:12px; }
+  .edge { fill:none; stroke:var(--line); stroke-width:1.4; }
+  .edge:hover, .edge.hot { stroke:var(--ink); stroke-width:2.4; }
+  .elabel { fill:var(--muted); font-size:10.5px; }
+  .node rect { fill:#fff; stroke-width:2; rx:6; }
+  .lanebg { fill:var(--lane); }
+  .lanetitle { font-weight:700; fill:var(--muted); text-transform:uppercase; font-size:11px; letter-spacing:.06em; }
+  table.m { border-collapse:collapse; font-size:11px; }
+  table.m th, table.m td { border:1px solid #e3dfd6; padding:3px 5px; text-align:center; }
+  table.m th.r { text-align:right; white-space:nowrap; }
+  table.m th.c { writing-mode:vertical-rl; transform:rotate(180deg); white-space:nowrap; }
+  #tip { padding:0 24px 16px; color:var(--muted); min-height:1.4em; }
+</style>
+</head>
+<body>
+<header>
+  <h1>DQ-005 probe: four layouts for the same view (TST-032 cookie/https chain)</h1>
+  <p>Same 13 concepts and 15 typed relations in every layout. Hover a relation to see its source. Crossing pairs are a proxy only: they ignore bends, edge–node overlaps and label collisions, and tab C uses straight lines while A and B route orthogonally, so counts are not comparable across tabs.</p>
+</header>
+<nav id="tabs"></nav>
+<div id="metric"></div>
+<div id="tip">Hover a relation to see its source.</div>
+<div id="stage"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/elkjs@0.9.3/lib/elk.bundled.js"></script>
+<script>
+const LAYERS = ["client", "network", "server"];
+
+const concepts = [
+  ["host-prefix", "__Host- cookie prefix", "client"],
+  ["secure-attr", "Secure cookie attribute", "client"],
+  ["secure-context", "Secure context", "client"],
+  ["webkit-policy", "WebKit cookie policy", "client"],
+  ["uir", "upgrade-insecure-requests", "client"],
+  ["lighthouse", "Lighthouse run", "client"],
+  ["https", "HTTPS", "network"],
+  ["tls-cert", "TLS certificate", "network"],
+  ["self-signed", "Self-signed certificate", "network"],
+  ["mkcert", "mkcert local CA", "network"],
+  ["hsts", "HSTS", "network"],
+  ["next-start", "next start (prod mode)", "server"],
+  ["csp", "CSP response header", "server"],
+];
+
+// Relations carry a source so the probe also shows CR-004 on hover.
+const relations = [
+  ["host-prefix", "secure-attr", "requires", "draft-ietf-httpbis-rfc6265bis §4.1.3.2 (also Path=/, no Domain)"],
+  ["secure-attr", "secure-context", "sent only over", "Hypothesis: the draft says \"secure\" as defined by the user agent"],
+  ["secure-context", "https", "satisfied by", "W3C Secure Contexts (not fetched)"],
+  ["webkit-policy", "secure-attr", "rejects over http://localhost", "Episode TST-032"],
+  ["next-start", "csp", "sends", "Episode TST-032"],
+  ["csp", "uir", "contains", "Episode TST-032"],
+  ["uir", "https", "upgrades requests to", "W3C Upgrade Insecure Requests §3.1"],
+  ["uir", "lighthouse", "breaks over http", "Episode TST-032"],
+  ["https", "tls-cert", "requires", "RFC 9110 / RFC 2818 (not fetched)"],
+  ["self-signed", "tls-cert", "is a", "RFC 5280 (not fetched)"],
+  ["mkcert", "tls-cert", "issues from a local CA", "Episode TST-032 options (unverified)"],
+  ["hsts", "https", "forces", "RFC 6797 (not fetched)"],
+  ["hsts", "uir", "complements", "W3C Upgrade Insecure Requests §1.1, §6.1"],
+  ["lighthouse", "self-signed", "can ignore errors of", "Episode TST-032"],
+  ["webkit-policy", "secure-context", "does not treat localhost as", "Episode TST-032 (unverified)"],
+];
+
+const W = 170, H = 34;
+const color = l => getComputedStyle(document.documentElement).getPropertyValue("--" + l);
+const byId = Object.fromEntries(concepts.map(([id, label, layer]) => [id, { id, label, layer }]));
+
+function crossings(polylines) {
+  const segs = polylines.map(p => p.pts.slice(1).map((b, i) => [p.pts[i], b]));
+  const hit = ([a, b], [c, d]) => {
+    const o = (p, q, r) => Math.sign((q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x));
+    return o(a, b, c) * o(a, b, d) < 0 && o(c, d, a) * o(c, d, b) < 0;
+  };
+  let n = 0;
+  for (let i = 0; i < polylines.length; i++)
+    for (let j = i + 1; j < polylines.length; j++) {
+      const [A, B] = [polylines[i], polylines[j]];
+      if ([A.s, A.t].some(v => v === B.s || v === B.t)) continue;
+      if (segs[i].some(s => segs[j].some(t => hit(s, t)))) n++;
+    }
+  return n;
+}
+
+function draw(nodes, polylines, lanes, width, height) {
+  const svg = [`<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
+    `<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#a8a296"/></marker></defs>`];
+  for (const l of lanes)
+    svg.push(`<rect class="lanebg" x="${l.x}" y="${l.y}" width="${l.w}" height="${l.h}" rx="10"/>`,
+             `<text class="lanetitle" x="${l.x + 12}" y="${l.y + 18}">${l.name}</text>`);
+  polylines.forEach((p, i) => {
+    const d = "M" + p.pts.map(q => `${q.x},${q.y}`).join(" L");
+    const mid = p.pts[Math.floor(p.pts.length / 2) - (p.pts.length % 2 ? 0 : 1)];
+    const end = p.pts[Math.floor(p.pts.length / 2)];
+    const mx = (mid.x + end.x) / 2, my = (mid.y + end.y) / 2;
+    svg.push(`<path class="edge" data-i="${i}" d="${d}" marker-end="url(#arr)"/>`,
+             `<text class="elabel" x="${mx + 4}" y="${my - 4}">${p.type}</text>`);
+  });
+  for (const n of nodes)
+    svg.push(`<g class="node"><rect x="${n.x}" y="${n.y}" width="${W}" height="${H}" stroke="${color(n.layer)}"/>`,
+             `<text x="${n.x + 10}" y="${n.y + 21}">${n.label}</text></g>`);
+  svg.push("</svg>");
+  return svg.join("");
+}
+
+function edgeBetween(a, b) {
+  const ca = { x: a.x + W / 2, y: a.y + H / 2 }, cb = { x: b.x + W / 2, y: b.y + H / 2 };
+  const clip = (c, o) => {
+    const dx = o.x - c.x, dy = o.y - c.y;
+    const s = Math.min(Math.abs((W / 2) / (dx || 1e-9)), Math.abs((H / 2) / (dy || 1e-9)));
+    return { x: c.x + dx * s, y: c.y + dy * s };
+  };
+  return [clip(ca, cb), clip(cb, ca)];
+}
+
+async function elkLayout(partitioned) {
+  const elk = new ELK();
+  const graph = {
+    id: "root",
+    layoutOptions: {
+      "elk.algorithm": "layered", "elk.direction": "RIGHT",
+      "elk.spacing.nodeNode": "28", "elk.layered.spacing.nodeNodeBetweenLayers": "70",
+      "elk.edgeRouting": "ORTHOGONAL", "elk.partitioning.activate": String(partitioned),
+    },
+    children: concepts.map(([id, , layer]) => ({
+      id, width: W, height: H,
+      layoutOptions: { "elk.partitioning.partition": String(LAYERS.indexOf(layer)) },
+    })),
+    edges: relations.map(([s, t], i) => ({ id: "e" + i, sources: [s], targets: [t] })),
+  };
+  const out = await elk.layout(graph);
+  const pad = 40;
+  const nodes = out.children.map(c => ({ ...byId[c.id], x: c.x + pad, y: c.y + pad }));
+  const polylines = out.edges.map((e, i) => {
+    const s = e.sections[0];
+    const pts = [s.startPoint, ...(s.bendPoints || []), s.endPoint].map(p => ({ x: p.x + pad, y: p.y + pad }));
+    return { s: relations[i][0], t: relations[i][1], type: relations[i][2], src: relations[i][3], pts };
+  });
+  let lanes = [];
+  if (partitioned)
+    lanes = LAYERS.map(name => {
+      const ns = nodes.filter(n => n.layer === name);
+      const x0 = Math.min(...ns.map(n => n.x)) - 16, x1 = Math.max(...ns.map(n => n.x)) + W + 16;
+      return { name, x: x0, y: 8, w: x1 - x0, h: out.height + 2 * pad - 16 };
+    });
+  return { nodes, polylines, lanes, width: out.width + 2 * pad, height: out.height + 2 * pad };
+}
+
+// ponytail: positions hand-tuned for this one chain; a real app would store them per view.
+const HAND = {
+  "lighthouse": [0, 0], "uir": [1, 0], "webkit-policy": [2, 0], "host-prefix": [3, 0],
+  "secure-attr": [3, 1], "secure-context": [2, 1],
+  "hsts": [0, 0], "https": [1, 0], "tls-cert": [2, 0], "self-signed": [2, 1], "mkcert": [3, 1],
+  "next-start": [0, 0], "csp": [1, 0],
+};
+function handLayout() {
+  const laneH = 130, colW = 230, top = 30, left = 40;
+  const nodes = concepts.map(([id, label, layer]) => {
+    const [col, row] = HAND[id], li = LAYERS.indexOf(layer);
+    return { id, label, layer, x: left + col * colW, y: top + li * laneH + 24 + row * 50 };
+  });
+  const n = Object.fromEntries(nodes.map(x => [x.id, x]));
+  const polylines = relations.map(([s, t, type, src]) => ({ s, t, type, src, pts: edgeBetween(n[s], n[t]) }));
+  const lanes = LAYERS.map((name, i) => ({ name, x: 16, y: top + i * laneH - 4, w: 4 * colW + 20, h: laneH - 10 }));
+  return { nodes, polylines, lanes, width: 4 * colW + 60, height: top + LAYERS.length * laneH + 10 };
+}
+
+function matrixView() {
+  const head = concepts.map(([, l, layer]) => `<th class="c" style="color:${color(layer)}">${l}</th>`).join("");
+  const rows = concepts.map(([id, l, layer]) => {
+    const cells = concepts.map(([to]) => {
+      const r = relations.find(([s, t]) => s === id && t === to);
+      return `<td title="${r ? r[3] : ""}">${r ? r[2] : ""}</td>`;
+    }).join("");
+    return `<tr><th class="r" style="color:${color(layer)}">${l}</th>${cells}</tr>`;
+  }).join("");
+  return `<table class="m"><tr><th>from \\ to</th>${head}</tr>${rows}</table>`;
+}
+
+const VIEWS = {
+  "A · Swimlanes (ELK partitions)": () => elkLayout(true),
+  "B · Automatic layered (ELK)": () => elkLayout(false),
+  "C · Hand-placed lanes": async () => handLayout(),
+  "D · Adjacency matrix": async () => null,
+};
+
+async function show(name) {
+  document.querySelectorAll("nav button").forEach(b => b.setAttribute("aria-pressed", b.textContent === name));
+  const stage = document.getElementById("stage"), metric = document.getElementById("metric");
+  const r = await VIEWS[name]();
+  if (!r) {
+    stage.innerHTML = matrixView();
+    metric.textContent = "Edge crossings: 0 by construction. Following the chain means jumping between rows and columns.";
+    return;
+  }
+  stage.innerHTML = draw(r.nodes, r.polylines, r.lanes, r.width, r.height);
+  metric.textContent = `Crossing pairs (proxy): ${crossings(r.polylines)}`;
+  stage.querySelectorAll(".edge").forEach(p => p.addEventListener("mouseenter", () => {
+    const e = r.polylines[p.dataset.i];
+    document.getElementById("tip").textContent =
+      `${byId[e.s].label} —${e.type}→ ${byId[e.t].label} · source: ${e.src}`;
+  }));
+}
+
+const tabs = document.getElementById("tabs");
+for (const name of Object.keys(VIEWS)) {
+  const b = document.createElement("button");
+  b.textContent = name;
+  b.onclick = () => show(name);
+  tabs.append(b);
+}
+show(Object.keys(VIEWS)[0]);
+</script>
+</body>
+</html>

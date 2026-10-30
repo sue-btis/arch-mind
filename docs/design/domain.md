@@ -1,0 +1,126 @@
+# Domain Model — arch-mind
+
+## Ubiquitous Language
+| Term | Definition | Related Requirements |
+|---|---|---|
+| Concept | One unit of architecture knowledge the author has captured, such as "Secure cookie attribute". Exists once. | FR-015, BR-002 |
+| Relation | A typed, directed link from one concept to another, with a source and the author's explanation. | FR-002 to FR-004, BR-001 |
+| Relation type | The verb of a relation, such as "requires", "complements", "alternative to". | FR-020, FR-022 |
+| Source | The reference that backs a relation: official documentation, a specification, or an episode. | FR-009, BR-001 |
+| Explanation | The author's one-sentence reason for a relation, in their own words. | FR-004 |
+| SEE-I | The four-part explanation of a concept: statement, elaboration, example, illustration. Each part is approved by the author. | FR-005, FR-033, BR-005 |
+| Episode | A real project situation where the concept came up, such as "TST-032 in the web project". | FR-007 |
+| Facet | One independent axis for classifying concepts: layer, domain or concern. | FR-006, FR-018 |
+| Layer | Where a concept lives in a system: client, network, server or data. Exactly one per concept. | BR-003, FR-019 |
+| Domain | The kind of product a concept belongs to, such as web, mobile or models. | FR-006 |
+| Concern | The quality a concept serves, such as security or performance. | FR-006 |
+| Capture | The act of turning a concept from a Claude Code session into a saved concept, through proposals the author reviews. | CAP-001 |
+| Proposal | Something Claude suggests during a capture (a relation, a SEE-I part, a recall question) that is not saved until the author confirms it. | FR-003, FR-008, FR-033, BR-004 |
+| Recall question | A question about a concept that the author answers from memory during review. | FR-008, FR-026 |
+| Review | One attempt at a recall question on a given day, marked right or wrong by the author. | FR-027, FR-032 |
+| Box | The Leitner level of a recall question; it sets how long until the question is due again. | FR-028 to FR-030, BR-006 |
+| Due date | The day a recall question should next be reviewed. | FR-026, BR-006 |
+| View | A filter over facets that selects concepts to draw. It is never stored as a copy of concepts. | FR-018, FR-015 |
+| Layer view | A view that draws concepts in stacked layer bands with typed arrows, for following chains. | FR-019 to FR-021 |
+| Matrix view | A view that draws concepts as rows and columns, with relation types in the cells. | FR-022 |
+| Reference screen | A 1366 × 768 px desktop browser window at 100 % zoom; every view must fit its width. | NFR-001, FR-023 |
+
+## Actors / Roles
+- Author: the only human. Starts captures, confirms or rewrites every proposal, studies views, reviews questions, and may edit concept files by hand.
+- Claude (in Claude Code): proposes relations, SEE-I drafts and recall questions during a capture. Has no authority to save anything the author did not confirm.
+
+## Core Concepts
+### Concept
+- Meaning: the unit of knowledge and the owner of everything said about it.
+- Identity: a lowercase slug (for example `secure-attr`), chosen at first capture and never changed afterwards.
+- Lifecycle: does not exist → saved (first capture) → extended (later captures add relations, questions or episodes; hand edits change content). No deletion flow in the MVP.
+- Invariants:
+  - The identifier is unique across the store (BR-002).
+  - Exactly one layer from the fixed list; any number of domains and concerns from the configured lists (BR-003, FR-006).
+  - A complete SEE-I, each part approved by the author (BR-005).
+  - At least one recall question (BR-005).
+  - Owns its outgoing relations; incoming relations belong to their own source concepts.
+
+### Relation
+- Meaning: a claim that one concept stands in a typed relation to another.
+- Identity: no identity of its own; it is a value inside its source concept, distinguished by (type, target).
+- Lifecycle: proposed → selected and explained → saved with its concept.
+- Invariants:
+  - Has a type, a target that is an existing concept, a non-empty source and an explanation (BR-001).
+  - The target must exist when the relation is saved (FR-010).
+
+### SEE-I
+- Meaning: the concept explained in four parts.
+- Identity: part of its concept.
+- Lifecycle per part: drafted by Claude or written by the author → accepted, edited or rewritten by the author → saved (FR-005, FR-033).
+- Invariants: all four parts present and approved before the concept is saved.
+
+### Recall Question
+- Meaning: a prompt that the author answers from memory.
+- Identity: stable within its concept, so review history keeps pointing at it when its text is edited.
+- Lifecycle: proposed → confirmed → in box 1, due the day after capture → moves between boxes with each review (FR-028 to FR-030).
+- Invariants: exactly one box and one due date at any time (BR-006); both follow from its confirmation day, its review history and the box intervals. The confirmation day is recorded when the author confirms the question and never changes.
+
+### Review
+- Meaning: a fact that the author answered a question on a day, right or wrong.
+- Identity: the question plus the moment it was recorded.
+- Lifecycle: recorded once; never edited or removed (BR-007).
+- Invariants: refers to an existing recall question; its result is right or wrong.
+
+### Facet catalog
+- Meaning: the allowed values for each facet.
+- Invariants: layers are fixed to client, network, server, data (BR-003). Who maintains domains and concerns is open (PRD PD-017).
+
+## Relationships and Ownership
+```mermaid
+classDiagram
+  Concept "1" *-- "1" SeeI : explains
+  Concept "1" *-- "0..*" Relation : owns outgoing
+  Relation "0..*" --> "1" Concept : targets
+  Concept "1" *-- "0..*" Episode : came up in
+  Concept "1" *-- "1..*" RecallQuestion : tested by
+  RecallQuestion "1" <-- "0..*" Review : about
+  Concept --> FacetCatalog : classified by
+```
+
+## State Transitions
+### Recall question box
+```mermaid
+stateDiagram-v2
+  [*] --> Box1 : confirmed at capture (due next day)
+  Box1 --> Box2 : right
+  Box2 --> Box3 : right
+  Box3 --> Box4 : right
+  Box4 --> Box5 : right
+  Box5 --> Box5 : right
+  Box2 --> Box1 : wrong
+  Box3 --> Box1 : wrong
+  Box4 --> Box1 : wrong
+  Box5 --> Box1 : wrong
+  Box1 --> Box1 : wrong
+```
+The number of boxes and their intervals are open (PRD PD-016); five boxes are drawn as the discovery example.
+
+### Capture
+```mermaid
+stateDiagram-v2
+  [*] --> Drafting : author names a concept
+  Drafting --> Reviewing : Claude proposes relations, SEE-I, questions
+  Reviewing --> Reviewing : author selects, edits, rewrites, explains
+  Reviewing --> Saved : every rule holds
+  Reviewing --> Rejected : a rule fails (missing source, missing target, duplicate id)
+  Rejected --> Reviewing : author fixes the named problem
+  Saved --> [*]
+```
+
+## Domain Boundaries / Modules
+- Knowledge: concepts, relations, SEE-I, episodes, recall question texts and the facet catalog. The only owner of what is true about a concept.
+- Capture: the proposal-and-confirmation workflow with Claude. Produces knowledge; owns nothing after the save.
+- Study: reviews, boxes and due dates. Owns review history; reads recall questions from Knowledge.
+- Views: layer view, matrix view and concept detail. Read-only over Knowledge and Study.
+
+## Cross-Boundary Rules
+- Only Capture and the author's hand edits change Knowledge; Views and Study never change concepts.
+- Study refers to recall questions by their stable identity, never by copying their text.
+- Every rule of BR-001 to BR-005 is enforced wherever Knowledge is written, so Capture and hand edits are judged by the same rules; hand edits that break a rule are reported (FR-017), not silently accepted.
+- Open: whether relation types come from a fixed list. The PRD does not fix one; the matrix view (FR-022) reads best with consistent types.

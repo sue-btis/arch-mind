@@ -1,0 +1,24 @@
+%% Capture (J-001): proposals are confirmed in the Claude Code conversation; the capture server validates before writing.
+sequenceDiagram
+  actor Author
+  participant CC as Claude Code
+  participant Cap as Capture server (MCP, stdio)
+  participant Store as Concept files
+
+  Author->>CC: Capture "Secure cookie attribute"
+  CC->>Cap: list_concepts
+  Cap->>Store: read frontmatter of all concepts
+  Cap-->>CC: ids, titles, layers
+  CC-->>Author: proposed relations with sources, SEE-I draft, layer and facets
+  Author->>CC: keep relations, write one explanation each, accept or rewrite each SEE-I part
+  CC-->>Author: proposed recall questions
+  Author->>CC: confirm questions, name the episode
+  CC->>Cap: save_concept(concept)
+  alt every rule holds (BR-001 to BR-005)
+    Cap->>Store: write temp file, rename into place
+    Cap-->>CC: saved
+    CC-->>Author: saved, first review due tomorrow
+  else a rule fails
+    Cap-->>CC: rejected: the exact field or relation (UX-003)
+    CC-->>Author: what to fix
+  end

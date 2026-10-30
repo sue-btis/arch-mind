@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>arch-mind Discovery</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Google+Sans+Mono&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #FAFAFA; --paper: #ffffff; --ink: #1f1f1f; --muted: #5f6368; --rule: #e3e3e3;
+    --accent: #1a73e8; --short-bg: #eef3fd; --note: #6b6b6b;
+    --client: #2f6fdf; --network: #1f9d74; --server: #c26a16; --pending: #b06000; --pending-bg: #fff4e0;
+    --dg-bg: #FAFAFA; --dg-line: #8a8f98;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #17181a; --paper: #1f2023; --ink: #e8eaed; --muted: #a8adb4; --rule: #33363b;
+      --accent: #8ab4f8; --short-bg: #1e2a3d; --note: #a0a0a0;
+      --client: #7aa7f5; --network: #4fc69f; --server: #e39a52; --pending: #f0b35a; --pending-bg: #3a2c12;
+      --dg-bg: #17181a; --dg-line: #8a8f98;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #17181a; --paper: #1f2023; --ink: #e8eaed; --muted: #a8adb4; --rule: #33363b;
+    --accent: #8ab4f8; --short-bg: #1e2a3d; --note: #a0a0a0;
+    --client: #7aa7f5; --network: #4fc69f; --server: #e39a52; --pending: #f0b35a; --pending-bg: #3a2c12;
+    --dg-bg: #17181a; --dg-line: #8a8f98;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 17px/1.65 "Google Sans", system-ui, sans-serif; }
+  code, .mono { font-family: "Google Sans Mono", ui-monospace, monospace; font-size: .9em; }
+  a { color: var(--accent); }
+  nav#toc { position: fixed; top: 0; left: 0; bottom: 0; width: 280px; overflow-y: auto;
+            padding: 28px 20px; border-right: 1px solid var(--rule); background: var(--paper); font-size: 14.5px; }
+  nav#toc h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 20px 0 6px; }
+  nav#toc ol { list-style: none; padding: 0; margin: 0; }
+  nav#toc li { margin: 4px 0; }
+  nav#toc a { text-decoration: none; color: var(--ink); }
+  nav#toc a:hover { color: var(--accent); }
+  main { margin-left: 280px; padding: 48px 32px 96px; }
+  .col { max-width: 65ch; margin: 0 auto; position: relative; }
+  header.cover { padding-bottom: 32px; border-bottom: 1px solid var(--rule); margin-bottom: 40px; }
+  header.cover h1 { font-size: 40px; line-height: 1.15; margin: 0 0 12px; font-weight: 700; }
+  .promise { font-size: 19px; color: var(--muted); }
+  .part { font-size: 13px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin: 64px 0 0; }
+  section.chapter { margin-top: 24px; padding-top: 16px; }
+  section.chapter > h2 { font-size: 28px; line-height: 1.25; margin: 0 0 16px; }
+  .num { color: var(--muted); font-weight: 400; margin-right: 6px; }
+  .short { background: var(--short-bg); border-left: 4px solid var(--accent); padding: 14px 18px; border-radius: 6px; margin: 0 0 24px; }
+  .short strong:first-child { display: block; font-size: 12.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 4px; }
+  h3 { font-size: 15px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin: 32px 0 8px; }
+  aside.note { position: absolute; right: -250px; width: 220px; font-size: 13.5px; line-height: 1.5; color: var(--note);
+               border-left: 2px solid var(--rule); padding-left: 10px; margin-top: 4px; }
+  @media (max-width: 1400px) { aside.note { position: static; width: auto; margin: 12px 0; } }
+  @media (max-width: 900px) {
+    nav#toc { position: static; width: auto; border-right: 0; border-bottom: 1px solid var(--rule); padding: 20px 16px; }
+    main { margin-left: 0; padding: 32px 16px 64px; }
+    header.cover h1 { font-size: 30px; }
+    table { display: block; overflow-x: auto; }
+  }
+  .label { font-size: 12px; font-weight: 700; padding: 1px 7px; border-radius: 10px; white-space: nowrap; }
+  .confirmed { background: #e6f4ea; color: #137333; }
+  .hypothesis { background: var(--pending-bg); color: var(--pending); }
+  .ask { background: #f3e8fd; color: #8430ce; }
+  .problem { background: #fce8e6; color: #c5221f; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .confirmed { background:#173d24; color:#81c995; }
+    :root:not([data-theme="light"]) .ask { background:#36214f; color:#d7aefb; } :root:not([data-theme="light"]) .problem { background:#4a1d1b; color:#f28b82; } }
+  table { border-collapse: collapse; width: 100%; font-size: 15px; margin: 12px 0; }
+  th, td { border-bottom: 1px solid var(--rule); padding: 7px 8px; text-align: left; vertical-align: top; }
+  th { font-weight: 500; color: var(--muted); }
+  figure { margin: 24px 0; }
+  figure svg { width: 100%; height: auto; display: block; background: var(--paper); border: 1px solid var(--rule); border-radius: 8px; }
+  figcaption { font-size: 14px; color: var(--muted); margin-top: 8px; }
+  .bridge { font-style: italic; color: var(--muted); margin-top: 28px; }
+  .rec { border: 1px dashed var(--accent); border-radius: 8px; padding: 14px 18px; margin: 20px 0; }
+  dl.glossary dt { font-weight: 700; margin-top: 14px; }
+  dl.glossary dd { margin: 2px 0 0 0; }
+  a.term { color: inherit; text-decoration: underline dotted var(--muted); text-underline-offset: 3px; }
+  svg text { font-family: "Google Sans", system-ui, sans-serif; fill: var(--ink); }
+  svg .t-node { font-size: 12.5px; font-weight: 500; }
+  svg .t-edge { font-size: 10.5px; font-style: italic; fill: var(--muted); }
+  svg .t-zone { font-size: 13px; font-weight: 700; fill: var(--muted); letter-spacing: .06em; }
+  svg .t-small { font-size: 11px; fill: var(--muted); }
+  svg .halo { paint-order: stroke; stroke: var(--paper); stroke-width: 4px; stroke-linejoin: round; }
+  svg .box { fill: var(--paper); stroke-width: 2; }
+  svg .zone { fill: var(--bg); stroke: var(--rule); }
+  svg .edge { fill: none; stroke: var(--dg-line); stroke-width: 1.5; }
+  svg .pending { stroke: var(--pending); stroke-dasharray: 5 4; }
+  @media print {
+    nav#toc { display: none; } main { margin-left: 0; padding: 0; }
+    aside.note { position: static; width: auto; }
+    section.chapter { break-before: page; } figure { break-inside: avoid; }
+    body { background: #fff; font-size: 11pt; }
+  }
+</style>
+</head>
+<body>
+<nav id="toc" aria-label="Contents">
+  <strong>arch-mind Discovery</strong>
+  <h2>Part I · The problem</h2>
+  <ol><li><a href="#ch1">1. Why do architecture answers get forgotten?</a></li></ol>
+  <h2>Part II · The options</h2>
+  <ol>
+    <li><a href="#ch2">2. Do I need to build anything?</a></li>
+    <li><a href="#ch3">3. Who should draw the relations?</a></li>
+    <li><a href="#ch4">4. How should a view be drawn?</a></li>
+    <li><a href="#ch5">5. How do capture skills reach the store?</a></li>
+    <li><a href="#ch6">6. When should recall questions come back?</a></li>
+    <li><a href="#ch7">7. How do I slice concepts into views?</a></li>
+  </ol>
+  <h2>Part III · Deciding</h2>
+  <ol>
+    <li><a href="#ch8">8. How do the options compare against my criteria?</a></li>
+    <li><a href="#ch9">9. What is still unknown?</a></li>
+  </ol>
+  <h2>Reference</h2>
+  <ol>
+    <li><a href="#glossary">Glossary</a></li>
+    <li><a href="#app-a">A. Decisions to make</a></li>
+    <li><a href="#app-b">B. Open questions for the author</a></li>
+    <li><a href="#app-c">C. Change log</a></li>
+  </ol>
+</nav>
+
+<main>
+<div class="col">
+
+<header class="cover">
+  <h1>How should arch-mind be built?</h1>
+  <p class="promise">By the end, the author can choose how arch-mind is built (views, capture, review, taxonomy) and defend why.</p>
+  <p>Source of every claim: <code>docs/discovery/findings.md</code> and the two probes in <code>docs/discovery/spikes/</code>. Each claim carries one label:
+  <span class="label confirmed">Confirmed</span> a source or a measurement says it;
+  <span class="label hypothesis">Hypothesis</span> inferred or not checked yet;
+  <span class="label ask">Ask</span> only you know it;
+  <span class="label problem">Problem</span> the evidence is broken or missing.</p>
+  <h3>Before you start</h3>
+  <p><strong>arch-mind</strong> is a personal tool you plan to build to learn software architecture. Concepts come up while you work with Claude Code, the AI coding assistant you use in your projects. arch-mind should <em>capture</em> each concept from that session, show it in small <em>views</em> next to related concepts, and bring it back for <em>review</em> as questions. "You" in this book is its author and only user.</p>
+  <p>You agreed on these criteria before seeing any option:</p>
+  <table>
+    <tr><th>Criterion</th><th>Type</th></tr>
+    <tr><td>1. Helps remember: weeks later you can explain the concept from memory</td><td>must</td></tr>
+    <tr><td>2. Own, readable views: each view reads at a glance and has your own design</td><td>must</td></tr>
+    <tr><td>3. Frictionless capture: saved from Claude Code, same session, under a minute</td><td>must</td></tr>
+    <tr><td>4. Relations with a source: every relation says where it comes from (docs, standard, or your project)</td><td>must</td></tr>
+    <tr><td>5. Learn by building it</td><td>nice to have</td></tr>
+    <tr><td>6. A sixth must you selected without writing it</td><td>must, text pending</td></tr>
+  </table>
+  <p>A <a class="term" href="#g-kill">kill criterion</a> was also fixed: if an existing tool already meets the four musts, adopt it instead of building. Concepts are sorted by <a class="term" href="#g-layer">layer</a>, the part of a system where they live: client (the browser or app), network (what travels between machines), server, and data. A <a class="term" href="#g-probe">probe</a> is a small throwaway program built only to measure something; this discovery built two. A <a class="term" href="#g-challenger">challenger</a>, a separate AI reviewer with no prior context, then checked every claim against its sources.</p>
+</header>
+
+<p class="part">Part I · The problem</p>
+
+<section class="chapter" id="ch1">
+  <h2><span class="num">1</span>Why do architecture answers get forgotten?</h2>
+  <div class="short"><strong>Short answer</strong>
+    Understanding an answer while you read it is not the same as remembering it. Two activities make knowledge stick: building the map of relations yourself, and pulling the answer back from memory later. Looking at a finished map helps, but less.</div>
+
+  <h3>Case</h3>
+  <p>In a web project, Claude asked you how to serve the app locally for test TST-032, an automated check of the site in Safari's engine and in Lighthouse (Google's tool that audits a page's quality). The question looked like one problem. It was a chain of thirteen <a class="term" href="#g-concept">concepts</a>:</p>
+  <ol>
+    <li>Your session cookie uses the <code>__Host-</code> prefix. A cookie with that prefix must also carry the <code>Secure</code> flag, which means "only send me over a safe connection". <span class="label confirmed">Confirmed</span> (cookie draft standard, §4.1.3.2)</li>
+    <li>Each browser decides what counts as a safe connection. In your project, WebKit (Safari's engine) did not treat <code>http://localhost</code> as safe and dropped the cookie. <span class="label hypothesis">Hypothesis</span> (seen in your project, not checked against WebKit's docs)</li>
+    <li>In production mode, <code>next start</code> (the command that runs a Next.js site as in production) sends a security header, the CSP (content security policy), with the rule <code>upgrade-insecure-requests</code>. That rule tells the browser to switch every <code>http</code> request to <code>https</code>. <span class="label confirmed">Confirmed</span> for what the rule does (W3C spec, §3.1)</li>
+    <li>Over plain <code>http</code>, that switch breaks the Lighthouse run. <span class="label hypothesis">Hypothesis</span> (seen in your project)</li>
+  </ol>
+  <p>One question touched 13 concepts and 15 <a class="term" href="#g-relation">relations</a> (counted in the view probe). You understood it when you read it. Would you be able to explain step 2 two weeks later?</p>
+
+  <h3>Mechanism</h3>
+  <p>Research compares three ways of studying. The numbers are <a class="term" href="#g-effect">effect sizes</a>: how far a group's average score moved compared with a group that studied another way.</p>
+  <table>
+    <tr><th>Way of studying</th><th>Effect</th><th>What it means</th><th>Evidence</th></tr>
+    <tr><td>You build the map of relations</td><td>0.72</td><td>The middle learner moves to about percentile 76</td><td><span class="label confirmed">Confirmed</span> via a summary</td></tr>
+    <tr><td>You study a map someone else made</td><td>0.43</td><td>The middle learner moves to about percentile 67</td><td><span class="label confirmed">Confirmed</span> via a summary</td></tr>
+    <tr><td>You recall answers from memory</td><td>—</td><td>Beat building concept maps, even on questions that need reasoning</td><td><span class="label confirmed">Confirmed</span> direction (Karpicke &amp; Blunt 2011)</td></tr>
+  </table>
+  <aside class="note">Percentiles from the normal curve: an effect of 0.72 moves the middle (50th) learner to the 76th percentile, because Φ(0.72) ≈ 0.76; for 0.43, Φ(0.43) ≈ 0.67.</aside>
+  <p>The first two numbers come from one meta-analysis (Schroeder et al. 2018, 142 effect sizes). Each is measured against its own comparison group, so they are not a head-to-head race. They still point the same way: what you produce sticks better than what you receive.</p>
+
+  <h3>Why it matters</h3>
+  <p>A beautiful map that you only look at is the weakest of the three. arch-mind has to make you build relations and pull answers back from memory. Pretty views alone do not meet your first must, "helps remember".</p>
+
+  <h3>What we don't know</h3>
+  <p><span class="label problem">Problem</span> No study tests the case arch-mind creates: an AI proposes the relations and you accept them. <span class="label hypothesis">Hypothesis</span> Spacing reviews over days helps memory; the spacing papers were not fetched.</p>
+  <p class="bridge">If building and recalling is what works, does any existing tool already do it?</p>
+</section>
+
+<p class="part">Part II · The options</p>
+
+<section class="chapter" id="ch2">
+  <h2><span class="num">2</span>Do I need to build anything?</h2>
+  <div class="short"><strong>Short answer</strong>
+    No surveyed tool meets your four musts at once. You tried Obsidian and ruled it out. The leading option is a hybrid: each concept lives in a Markdown file, and your own app reads those files to draw views and run reviews.</div>
+
+  <h3>Case</h3>
+  <p>The closest tool was Obsidian with three community plugins: Breadcrumbs for typed relations, Juggl for small styled graphs, and Spaced Repetition for reviews. <span class="label confirmed">Confirmed</span> each plugin does its own part. <span class="label hypothesis">Hypothesis</span> A relation cannot carry its own source, and a view cannot be filtered by layer. You reviewed it yourself and said it does not reach what you want. Twelve other tools were surveyed (Anki, Logseq, RemNote, Heptabase, Tana, Kumu, TheBrain and more). None covered capture from Claude Code, sourced relations, focused views and scheduled recall together. <span class="label hypothesis">Hypothesis</span>, moderate confidence: several product pages could not be fetched.</p>
+
+  <h3>Mechanism</h3>
+  <p>In the hybrid, the files are the single source of truth. A <a class="term" href="#g-markdown">Markdown</a> file is plain text that any editor, Git or Obsidian can open. The top of each file, the <a class="term" href="#g-frontmatter">frontmatter</a>, holds the structured part: layer, relations with their sources, and recall questions. A <a class="term" href="#g-skill">capture skill</a> writes the files; the app reads them and draws. The probe in chapter 5 wrote this file:</p>
+  <pre class="mono" style="font-size:13px;overflow-x:auto;background:var(--paper);border:1px solid var(--rule);padding:12px;border-radius:6px">---
+id: "secure-attr"
+title: "Secure cookie attribute"
+layer: "client"
+relations:
+  - { type: "needs", to: "secure-context", source: "draft-ietf-httpbis-rfc6265bis" }
+recall:
+  - "Why did WebKit drop the session cookie over http://*.localhost?"
+---
+A cookie with Secure is only sent over secure transport.</pre>
+  <figure>
+    <svg viewBox="0 0 760 300" role="img" aria-label="Hybrid: capture writes Markdown files, the app reads them">
+      <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8a8f98"/></marker></defs>
+      <rect class="zone" x="16" y="20" width="220" height="250" rx="10"/>
+      <text class="t-zone halo" x="30" y="44">CLAUDE CODE SESSION</text>
+      <rect class="box" x="36" y="70" width="180" height="56" rx="7" stroke="var(--client)"/>
+      <text class="t-node" x="50" y="94">Your project work</text><text class="t-small" x="50" y="112">a concept comes up</text>
+      <rect class="box pending" x="36" y="180" width="180" height="56" rx="7"/>
+      <text class="t-node" x="50" y="204">Capture skill</text><text class="t-small" x="50" y="222">to be built</text>
+      <polyline class="edge" points="126,126 126,174" marker-end="url(#ar)"/>
+      <rect class="box" x="290" y="120" width="180" height="76" rx="7" stroke="var(--network)"/>
+      <text class="t-node" x="304" y="146">Concept files (.md)</text><text class="t-small" x="304" y="164">one file per concept</text><text class="t-small" x="304" y="180">source of truth</text>
+      <polyline class="edge" points="216,208 252,208 252,170 284,170" marker-end="url(#ar)"/>
+      <text class="t-edge halo" x="228" y="228">writes</text>
+      <rect class="zone" x="524" y="20" width="220" height="250" rx="10"/>
+      <text class="t-zone halo" x="538" y="44">READERS</text>
+      <rect class="box pending" x="544" y="70" width="180" height="56" rx="7"/>
+      <text class="t-node" x="558" y="94">arch-mind app</text><text class="t-small" x="558" y="112">views + review, to be built</text>
+      <rect class="box" x="544" y="180" width="180" height="56" rx="7" stroke="var(--server)"/>
+      <text class="t-node" x="558" y="204">Any editor or Git</text><text class="t-small" x="558" y="222">readable without the app</text>
+      <polyline class="edge" points="476,145 510,145 510,98 538,98" marker-end="url(#ar)"/>
+      <polyline class="edge" points="476,172 510,172 510,208 538,208" marker-end="url(#ar)"/>
+      <text class="t-edge halo" x="484" y="136">reads</text>
+    </svg>
+    <figcaption>Look at the middle box: everything flows through plain files. If the app is closed or abandoned, your knowledge stays readable. Dashed amber boxes are not built yet.</figcaption>
+  </figure>
+
+  <h3>Why it matters</h3>
+  <p>The kill criterion did not fire, so building is justified. The hybrid matches what you said: Markdown gives compatibility with modern tools. It also lowers the risk of building: your data never depends on the app.</p>
+
+  <h3>What we don't know</h3>
+  <p><span class="label hypothesis">Hypothesis</span> The review history (dates and answers) is the one thing the app must write. Where it lives, inside each concept file or in a separate file, is untested. Writing review dates into concept files on every review would add noise to Git history.</p>
+  <p class="bridge">If you build it, who should create each relation: Claude, or you?</p>
+</section>
+
+<section class="chapter" id="ch3">
+  <h2><span class="num">3</span>Who should draw the relations?</h2>
+  <div class="short"><strong>Short answer</strong>
+    The evidence leans toward you building the relations, with caveats: the numbers are not a head-to-head test, and nobody has studied accepting relations an AI proposes. A middle path: Claude proposes candidates with their sources, and you choose and explain each one in your own words.</div>
+
+  <h3>Case</h3>
+  <p>You capture "Secure cookie attribute" after TST-032. Claude proposes three candidate relations, each with a source. You keep one, "Secure cookie <em>is sent only over</em> a secure context", and write one sentence: "WebKit did not count localhost as secure, so the cookie never left the browser." Claude turns your sentence into a recall question: "Why did WebKit drop the session cookie over http://localhost?"</p>
+
+  <h3>Mechanism</h3>
+  <p>Chapter 1 showed two effects: building a map (0.72) beats studying one (0.43). Choosing among proposals sits between those two. Writing the reason in your own words, called <a class="term" href="#g-explain">explain-back</a>, moves it closer to building. <span class="label hypothesis">Hypothesis</span> This option was added by the challenger and not researched.</p>
+  <p>The two ideas below fit together: explain-back is for each relation, SEE-I for the concept as a whole.</p>
+  <p>You proposed a structured version for the concept itself: <a class="term" href="#g-seei">SEE-I</a>. You <strong>S</strong>tate the concept in one sentence, <strong>E</strong>laborate it in other words, give an <strong>E</strong>xample, and <strong>I</strong>llustrate it with an analogy or picture. For the Secure cookie: <em>State</em> "a Secure cookie only travels over a connection the browser trusts"; <em>Elaborate</em> "the browser, not the server, decides what counts as trusted"; <em>Example</em> "WebKit dropped it over http://localhost in TST-032"; <em>Illustrate</em> "like a courier who only delivers to a building with a guard at the door". Each part can become one recall question. <span class="label hypothesis">Hypothesis</span> The method comes from Paul and Elder's critical-thinking work (not fetched); you report it works for you.</p>
+  <figure>
+    <svg viewBox="0 0 760 210" role="img" aria-label="Learning loop: propose, choose and explain, save, recall">
+      <defs><marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8a8f98"/></marker></defs>
+      <rect class="box" x="20" y="40" width="150" height="62" rx="7" stroke="var(--network)"/><text class="t-node" x="34" y="66">Claude proposes</text><text class="t-small" x="34" y="84">relations + sources</text>
+      <rect class="box" x="210" y="40" width="160" height="62" rx="7" stroke="var(--client)"/><text class="t-node" x="224" y="66">You choose</text><text class="t-small" x="224" y="84">and explain in a sentence</text>
+      <rect class="box" x="410" y="40" width="150" height="62" rx="7" stroke="var(--server)"/><text class="t-node" x="424" y="66">Saved to file</text><text class="t-small" x="424" y="84">+ recall question</text>
+      <rect class="box" x="600" y="40" width="140" height="62" rx="7" stroke="var(--client)"/><text class="t-node" x="614" y="66">You recall</text><text class="t-small" x="614" y="84">days later</text>
+      <polyline class="edge" points="170,71 204,71" marker-end="url(#ar2)"/>
+      <polyline class="edge" points="370,71 404,71" marker-end="url(#ar2)"/>
+      <polyline class="edge" points="560,71 594,71" marker-end="url(#ar2)"/>
+      <polyline class="edge" points="670,102 670,160 290,160 290,108" marker-end="url(#ar2)"/>
+      <text class="t-edge halo" x="400" y="178">a miss sends you back to the relation</text>
+    </svg>
+    <figcaption>Two of the four steps are yours: choosing and recalling. Those are the steps the research rewards.</figcaption>
+  </figure>
+
+  <h3>Why it matters</h3>
+  <p>This sets a trade-off between two of your musts. More work from you per capture helps memory (first must). Less work keeps capture under a minute (third must).</p>
+
+  <h3>What we don't know</h3>
+  <p><span class="label problem">Problem</span> No study measures choosing among AI proposals. <span class="label ask">Ask</span> Is one sentence per relation acceptable effort for you?</p>
+  <p class="bridge">Once you have chosen and explained the relations, how should they be drawn on screen?</p>
+</section>
+
+<section class="chapter" id="ch4">
+  <h2><span class="num">4</span>How should a view be drawn?</h2>
+  <div class="short"><strong>Short answer</strong>
+    You picked two of the four probe layouts: columns by layer (A) and the matrix (D). They seem to do different jobs: A for following a chain, D for checking every relation at once. A does not fit one screen yet, and "reads at a glance" still needs a definition.</div>
+
+  <h3>Case</h3>
+  <p>The probe drew the same 13 concepts and 15 relations from chapter 1 in four ways.</p>
+  <table>
+    <tr><th>Layout</th><th>Crossing pairs</th><th>Size</th><th>What you see</th></tr>
+    <tr><td>A · Columns by layer</td><td>0</td><td>1,954 × 348 px</td><td>Client, network, server side by side; needs sideways scrolling</td></tr>
+    <tr><td>B · Automatic layers</td><td>0</td><td>1,474 × 318 px</td><td>Layers mixed; only color shows them, so position tells you nothing about the layer</td></tr>
+    <tr><td>C · Hand-placed lanes</td><td>5</td><td>980 × 430 px</td><td>Fits a screen; straight lines, so not comparable</td></tr>
+    <tr><td>D · Matrix</td><td>0, by construction, not measured</td><td>—</td><td>Every pair visible; following a chain means jumping rows</td></tr>
+  </table>
+  <aside class="note">A <em>crossing pair</em> is two relations whose lines cross. It is a rough proxy: it ignores bends, lines passing under boxes, and labels that collide.</aside>
+
+  <h3>Mechanism</h3>
+  <p>A <a class="term" href="#g-layered">layered layout</a> sorts concepts into ranks so arrows mostly point one way, then reorders each rank to reduce crossings. Layout A adds a <a class="term" href="#g-partition">partition</a> per layer, which forces client concepts left of network concepts and network left of server. That ordering is why it grows wide. An <a class="term" href="#g-matrix">adjacency matrix</a> lists concepts as both rows and columns and writes each relation in the cell where they meet, so nothing can cross.</p>
+
+  <h3>Why it matters</h3>
+  <p>Your second must, own and readable views, is decided here. The rendering engine becomes a design decision. elkjs, the engine behind A, is maintained (version 0.12.1, Oct 2026). <span class="label hypothesis">Hypothesis</span> The probe used the older 0.9.3; the newer version may place nodes differently, so the sizes above could change.</p>
+
+  <h3>What we don't know</h3>
+  <p><span class="label ask">Ask</span> What does "at a glance" mean for you: no sideways scrolling at 1,366 px wide? Sources readable without hovering? <span class="label hypothesis">Hypothesis</span> Two untested options could fix A's width: stacking layers as horizontal rows, with an automatic placer (a "solver") that keeps each concept inside its row and only chooses the order and the arrow paths, or a focus view that starts at one concept and shows its neighbors.</p>
+  <p class="bridge">Views draw what is stored. How does a concept get stored from a Claude Code session?</p>
+</section>
+
+<section class="chapter" id="ch5">
+  <h2><span class="num">5</span>How do capture skills reach the store?</h2>
+  <div class="short"><strong>Short answer</strong>
+    There are six paths. The probe tested the leading one, a plugin with a small local MCP server: it rejected a relation without a source and wrote a readable Markdown file. Two things are still unmeasured: whether Claude Code asks your permission before saving, and how long a full capture takes.</div>
+
+  <h3>Case</h3>
+  <p>The probe server received the "Secure cookie attribute" concept and saved it as <code>secure-attr.md</code>. When given a relation with no source, it refused with "relation 0 needs type, to and source". When given the same concept twice, it refused the duplicate. <span class="label confirmed">Confirmed</span> by <code>node check.mjs</code> on 30 Oct 2026. That script talked to the server directly, the way Claude Code would, but without Claude Code in the middle; the real flow inside a session is not tested yet.</p>
+
+  <h3>Mechanism</h3>
+  <p><a class="term" href="#g-mcp">MCP</a> (Model Context Protocol) is how Claude Code talks to outside tools. In the <a class="term" href="#g-stdio">stdio</a> form, Claude Code starts the server as a child program and they talk through its text input and output. No network port opens, so a web page in your browser cannot reach it. A plugin can bundle the capture skill and this server together. <span class="label confirmed">Confirmed</span> (Claude Code plugin docs).</p>
+  <table>
+    <tr><th>Path</th><th>Validates data</th><th>Works with app closed</th><th>Main risk</th></tr>
+    <tr><td>Skill edits files directly</td><td>No</td><td>Yes</td><td>Anything can be written</td></tr>
+    <tr><td>Local web API of the app</td><td>Yes</td><td>No</td><td>Web pages can attack local servers unless guarded</td></tr>
+    <tr><td><strong>Plugin + stdio MCP server</strong></td><td>Yes</td><td>Yes</td><td>Runs with your user's rights: a bug could touch any of your files</td></tr>
+    <tr><td>Inbox you accept inside the app</td><td>At import</td><td>Yes</td><td>Capture is not final until you open the app</td></tr>
+    <tr><td>Command-line tool called by the skill</td><td>Yes</td><td>Yes</td><td>Untested</td></tr>
+    <tr><td>Files + a Claude Code hook that checks them</td><td>After writing</td><td>Yes</td><td>Untested</td></tr>
+  </table>
+
+  <p>Two paths need a word. In the <em>inbox</em>, the skill only appends the concept to a waiting list, and nothing becomes final until you open the app and accept it, so capture costs a second step. A <em>hook</em> is a script Claude Code runs automatically after each file edit; it could check the file, but only after it was written. The plugin path leads because it is the only one that checks the data <em>before</em> saving, works with the app closed, and opens no network port; the command-line and hook paths are untested.</p>
+
+  <h3>Why it matters</h3>
+  <p>Your third and fourth musts meet here. Capture without friction needs the path to work with the app closed. Relations with a source need someone to refuse a relation without one.</p>
+
+  <h3>What we don't know</h3>
+  <p><span class="label ask">Ask</span> Run the plugin once in a normal session to see whether it asks permission; the automated check could not run because the background Claude Code process was not signed in. <span class="label problem">Problem</span> The server only checks that the source is not empty; "x" would pass, and it does not check that the related concept exists.</p>
+  <p class="bridge">Saved concepts come back as recall questions. When should they come back?</p>
+</section>
+
+<section class="chapter" id="ch6">
+  <h2><span class="num">6</span>When should recall questions come back?</h2>
+  <div class="short"><strong>Short answer</strong>
+    A scheduler decides when each question returns. The simplest, Leitner boxes, takes a few lines of code. FSRS, the most studied, predicts forgetting better than a baseline that gives every question the same chance, on about 350 million reviews from the open srs-benchmark, but no comparison against the older SM-2 method was found. With 50–300 concepts, simple is enough to start.</div>
+
+  <h3>Case</h3>
+  <p>Leitner boxes: box 1 waits 1 day, box 2 waits 3, box 3 waits 7, box 4 waits 16, box 5 waits 35. A right answer moves the question up one box and waits that box's gap; a wrong answer sends it back to box 1. For "Why did WebKit drop the session cookie?":</p>
+  <table>
+    <tr><th>Day</th><th>Box</th><th>Your answer</th><th>Next review</th></tr>
+    <tr><td>0</td><td>1</td><td>captured</td><td>day 1</td></tr>
+    <tr><td>1</td><td>1</td><td>right → box 2</td><td>box 2 waits 3 days → day 4</td></tr>
+    <tr><td>4</td><td>2</td><td>right → box 3</td><td>box 3 waits 7 days → day 11</td></tr>
+    <tr><td>11</td><td>3</td><td>wrong → box 1</td><td>box 1 waits 1 day → day 12</td></tr>
+  </table>
+  <aside class="note">The gaps 1, 3, 7, 16, 35 are an example, not a researched value.</aside>
+
+  <h3>Mechanism</h3>
+  <p>A <a class="term" href="#g-scheduler">scheduler</a> estimates when you are about to forget. Leitner uses fixed boxes. <a class="term" href="#g-fsrs">FSRS</a> estimates two numbers per question, how fast you forget it and how hard it is, and schedules the review when your chance of remembering drops to a target such as 90 %. <span class="label confirmed">Confirmed</span> FSRS-6 predicts better than the baseline when repeat reviews on the same day are left out (log loss 0.346 vs 0.395; log loss measures how wrong the predicted chances were, lower is better). When same-day repeats are counted, it scores 0.384 vs 0.382, slightly worse; the benchmark does not explain why. SM-2 is the older method behind classic Anki: one "ease" number per question stretches each gap. A maintained library exists (ts-fsrs, MIT license).</p>
+
+  <h3>Why it matters</h3>
+  <p>The review screen of the app depends on this choice. Starting with Leitner keeps the first version small. If the review history is kept (chapter 2 leaves where open), you can switch to FSRS later. The 50–300 concepts is an estimate of a year of your learning, not a measured number.</p>
+
+  <h3>What we don't know</h3>
+  <p><span class="label hypothesis">Hypothesis</span> FSRS tunes itself with thousands of reviews; with a few hundred it runs on default settings, and its advantage there is unmeasured.</p>
+  <p class="bridge">One more choice shapes every view: how concepts are grouped.</p>
+</section>
+
+<section class="chapter" id="ch7">
+  <h2><span class="num">7</span>How do I slice concepts into views?</h2>
+  <div class="short"><strong>Short answer</strong>
+    No single classification places every concept. The candidate is to tag each concept on three independent axes, called facets: layer, domain and concern. Concepts that span layers stay in one place and connect through relations. This is a hypothesis: the taxonomy sources were not fetched.</div>
+
+  <h3>Case</h3>
+  <p>HSTS (HTTP Strict Transport Security) is a header the server sends and the browser enforces: "use https for this site from now on". Is it client, network or server? A single tree forces a wrong answer. With facets: layer = network, domain = web, concern = security. Its link to the browser is a relation: "HSTS <em>forces</em> HTTPS".</p>
+
+  <h3>Mechanism</h3>
+  <p>A <a class="term" href="#g-facet">facet</a> is one independent way to classify, like filtering a store by size and by color at the same time. Three facets:</p>
+  <ul>
+    <li><strong>Layer</strong>: the same client / network / server / data used in chapter 4's views.</li>
+    <li><strong>Domain</strong>: the kind of product, such as web, mobile, or AI models.</li>
+    <li><strong>Concern</strong>: the quality the concept serves, such as security or performance.</li>
+  </ul>
+  <p>Each facet is a field in the concept file's frontmatter. Known classifications each cover only one axis: network layers (the protocol stack, from cables up to HTTP) cover protocols only; C4 levels (system, container, component, code) cover zoom level; quality attributes (an ISO list such as security and reliability) cover concerns.</p>
+  <figure>
+    <svg viewBox="0 0 760 220" role="img" aria-label="One concept with three facets">
+      <rect class="box" x="300" y="80" width="160" height="56" rx="7" stroke="var(--network)"/>
+      <text class="t-node" x="352" y="113">HSTS</text>
+      <rect class="box" x="30" y="20" width="200" height="50" rx="7" stroke="var(--dg-line)"/><text class="t-node" x="44" y="42">Layer: network</text><text class="t-small" x="44" y="59">client · network · server · data</text>
+      <rect class="box" x="30" y="150" width="200" height="50" rx="7" stroke="var(--dg-line)"/><text class="t-node" x="44" y="172">Domain: web</text><text class="t-small" x="44" y="189">web · mobile · models</text>
+      <rect class="box" x="530" y="80" width="200" height="56" rx="7" stroke="var(--dg-line)"/><text class="t-node" x="544" y="104">Concern: security</text><text class="t-small" x="544" y="122">security · performance · …</text>
+      <polyline class="edge" points="230,45 265,45 265,100 294,100"/>
+      <polyline class="edge" points="230,175 265,175 265,118 294,118"/>
+      <polyline class="edge" points="460,108 524,108"/>
+    </svg>
+    <figcaption>Each facet is a separate filter. A view is any combination, for example web × network.</figcaption>
+  </figure>
+
+  <h3>Why it matters</h3>
+  <p>It defines what a view is: a filter over facets, never a copy of concepts.</p>
+  <h3>What we don't know</h3>
+  <p><span class="label hypothesis">Hypothesis</span> The lists inside each facet are examples. <span class="label ask">Ask</span> Should each concept have exactly one layer?</p>
+  <p class="bridge">With every option on the table, how do they compare?</p>
+</section>
+
+<p class="part">Part III · Deciding</p>
+
+<section class="chapter" id="ch8">
+  <h2><span class="num">8</span>How do the options compare against my criteria?</h2>
+  <div class="short"><strong>Short answer</strong>
+    The leading combination passes all four musts on paper. Only the fourth must, relations with a source, has a probe behind it, and the probe enforces it only partly. The other three rest on hypotheses until the app is used.</div>
+  <table>
+    <tr><th>Criterion</th><th>Leading combination</th><th>Evidence</th></tr>
+    <tr><td>Helps remember (must)</td><td>You choose and explain relations; scheduled recall</td><td><span class="label confirmed">Confirmed</span> direction in research; <span class="label hypothesis">Hypothesis</span> for AI-proposed relations</td></tr>
+    <tr><td>Own, readable views (must)</td><td>Columns by layer + matrix</td><td><span class="label ask">Ask</span> you chose them; width unresolved</td></tr>
+    <tr><td>Frictionless capture (must)</td><td>Plugin + stdio MCP server</td><td><span class="label hypothesis">Hypothesis</span> not timed</td></tr>
+    <tr><td>Relations with a source (must)</td><td>Server refuses relations without a source</td><td><span class="label confirmed">Confirmed</span> in the probe, only "not empty"</td></tr>
+    <tr><td>Learn by building it</td><td>Custom app, layout engine, scheduler</td><td>Yes by construction</td></tr>
+  </table>
+  <div class="rec"><strong>Recommendation (not a decision).</strong> Build the hybrid: Markdown files as the store, your own app for views and review. Capture through a plugin with a local stdio MCP server. Claude proposes relations with sources; you choose and explain each, and write each concept's body as SEE-I. Keep views A (stacked into lanes so they fit a screen) and D. Start reviews with Leitner boxes. Tag concepts with layer, domain and concern.</div>
+  <p class="bridge">What still has to be learned before or while building?</p>
+</section>
+
+<section class="chapter" id="ch9">
+  <h2><span class="num">9</span>What is still unknown?</h2>
+  <div class="short"><strong>Short answer</strong>
+    Six things are open. The sixth must you selected without text, and the meaning of "at a glance" are yours to answer. The rest are measured by using a first version: the permission prompt, capture time, where review history lives, and whether the taxonomy holds.</div>
+  <table>
+    <tr><th>Open item</th><th>How it gets resolved</th></tr>
+    <tr><td>Your sixth must (selected, text missing)</td><td><span class="label ask">Ask</span> you state it</td></tr>
+    <tr><td>"At a glance" for views</td><td><span class="label ask">Ask</span> you define it; then test a stacked layout</td></tr>
+    <tr><td>Permission prompt for the capture tool</td><td>One run in a normal Claude Code session</td></tr>
+    <tr><td>Capture time</td><td>Count conversation turns per capture in real use</td></tr>
+    <tr><td>Where review history lives</td><td>Design decision (inside each file or separate)</td></tr>
+    <tr><td>Taxonomy sources</td><td>Fetch C4, ISO/IEC 25010 and network-layer sources; try 20 real concepts</td></tr>
+  </table>
+</section>
+
+<h2 id="glossary" class="part">Glossary</h2>
+<dl class="glossary">
+  <dt id="g-kill">Kill criterion</dt><dd>An answer agreed in advance that would cancel the project, here: an existing tool already meets the four musts.</dd>
+  <dt id="g-layer">Layer</dt><dd>Where a concept lives in a system: client, network, server or data.</dd>
+  <dt id="g-probe">Probe</dt><dd>A small throwaway program built to measure one thing.</dd>
+  <dt id="g-challenger">Challenger</dt><dd>A separate AI reviewer with no prior context that checks each claim against its source.</dd>
+  <dt id="g-skill">Capture skill</dt><dd>An instruction package for Claude Code that saves a concept during a session.</dd>
+  <dt id="g-concept">Concept</dt><dd>One unit of architecture knowledge, such as "<code>__Host-</code> cookie prefix". Stored once.</dd>
+  <dt id="g-relation">Relation</dt><dd>A typed, directed link between two concepts, such as "requires" or "complements", with a source.</dd>
+  <dt id="g-effect">Effect size</dt><dd>How far a group's average moved compared with another group, measured in units of how spread the scores are.</dd>
+  <dt id="g-markdown">Markdown</dt><dd>Plain text with light formatting marks; readable in any editor.</dd>
+  <dt id="g-frontmatter">Frontmatter</dt><dd>The block at the top of a Markdown file that holds structured fields.</dd>
+  <dt id="g-explain">Explain-back</dt><dd>Writing a relation's reason in your own words before saving it.</dd>
+  <dt id="g-seei">SEE-I</dt><dd>State, Elaborate, Exemplify, Illustrate: four steps to explain a concept in your own words.</dd>
+  <dt id="g-layered">Layered layout</dt><dd>A drawing method that sorts nodes into ranks and reorders them to reduce crossing lines.</dd>
+  <dt id="g-partition">Partition</dt><dd>A group the layout must keep together and in order, used here for layers.</dd>
+  <dt id="g-matrix">Adjacency matrix</dt><dd>A grid with concepts as rows and columns; each cell shows the relation between a pair.</dd>
+  <dt id="g-mcp">MCP (Model Context Protocol)</dt><dd>The standard Claude Code uses to call outside tools.</dd>
+  <dt id="g-stdio">stdio</dt><dd>Talking to a child program through its text input and output, without a network port.</dd>
+  <dt id="g-scheduler">Scheduler</dt><dd>The rule that decides when a recall question comes back.</dd>
+  <dt id="g-fsrs">FSRS</dt><dd>Free Spaced Repetition Scheduler: estimates how fast you forget each item and schedules reviews to hit a target memory rate.</dd>
+  <dt id="g-facet">Facet</dt><dd>One independent axis of classification, such as layer or domain.</dd>
+</dl>
+
+<h2 id="app-a" class="part">Appendix A · Decisions to make</h2>
+<table>
+  <tr><th>Question</th><th>Decision</th><th>Chapter</th></tr>
+  <tr><td>DQ-001</td><td>Build vs adopt</td><td>2</td></tr>
+  <tr><td>DQ-002</td><td>Taxonomy for views</td><td>7</td></tr>
+  <tr><td>DQ-003</td><td>Who builds relations; view size limit</td><td>1, 3</td></tr>
+  <tr><td>DQ-004</td><td>Review scheduler</td><td>6</td></tr>
+  <tr><td>DQ-005</td><td>Visual approach for views</td><td>4</td></tr>
+  <tr><td>DQ-006</td><td>Capture path</td><td>5</td></tr>
+</table>
+
+<h2 id="app-b" class="part">Appendix B · Open questions for the author</h2>
+<ul>
+  <li>What is your sixth must criterion?</li>
+  <li>What does "at a glance" mean for a view?</li>
+  <li>Is one sentence per relation acceptable effort at capture?</li>
+  <li>Should each concept have exactly one layer?</li>
+</ul>
+
+<h2 id="app-c" class="part">Appendix C · Change log</h2>
+<ul>
+  <li>30 Oct 2026 — First version, after the challenge corrections in <code>findings.md</code>.</li>
+  <li>30 Oct 2026 — Added SEE-I (your proposal) to chapter 3.</li>
+  <li>30 Oct 2026 — Cold-reader pass: added "Before you start" (what arch-mind is, criteria, kill criterion, layers, probe, challenger); defined Lighthouse, next start, log loss, SM-2, facets; fixed the Leitner rule, the review-history contradiction between chapters 2 and 6, and the chapter 3 bridge; showed a sample concept file.</li>
+</ul>
+
+</div>
+</main>
+</body>
+</html>
