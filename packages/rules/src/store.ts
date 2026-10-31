@@ -1,11 +1,11 @@
 import { randomBytes } from "node:crypto";
-import { access, link, mkdir, open, readFile, readdir, unlink, writeFile } from "node:fs/promises";
+import { access, link, mkdir, open, readFile, readdir, rename, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { parseConcept, serializeConcept } from "./concept-file.ts";
 import { ID_PATTERN, SEE_I_PARTS, type Concept, type Facets, type FileProblem, type RuleError } from "./model.ts";
-import { validateNewConcept } from "./validate.ts";
+import { validateExtension, validateNewConcept } from "./validate.ts";
 
 export class StoreError extends Error {}
 
@@ -125,10 +125,11 @@ export async function loadConcepts(storePath: string): Promise<{ concepts: Conce
 
 export class DuplicateIdError extends Error {}
 
-export async function writeConceptAtomic(
+async function writeViaTemp(
   storePath: string,
   concept: Concept,
-  beforeRename?: () => void | Promise<void>,
+  beforeRename: (() => void | Promise<void>) | undefined,
+  publish: (tempFile: string, finalFile: string) => Promise<void>,
 ): Promise<string> {
   const dir = join(storePath, "concepts");
   const finalFile = join(dir, `${concept.id}.md`);
@@ -142,6 +143,19 @@ export async function writeConceptAtomic(
       await handle.close();
     }
     await beforeRename?.();
+    await publish(tempFile, finalFile);
+  } finally {
+    await unlink(tempFile).catch(() => {});
+  }
+  return finalFile;
+}
+
+export function writeConceptAtomic(
+  storePath: string,
+  concept: Concept,
+  beforeRename?: () => void | Promise<void>,
+): Promise<string> {
+  return writeViaTemp(storePath, concept, beforeRename, async (tempFile, finalFile) => {
     // link fails with EEXIST instead of replacing, so two saves of one id can never overwrite each other
     // (rename would replace silently).
     try {
@@ -150,10 +164,15 @@ export async function writeConceptAtomic(
       if ((error as NodeJS.ErrnoException).code === "EEXIST") throw new DuplicateIdError(concept.id);
       throw error;
     }
-  } finally {
-    await unlink(tempFile).catch(() => {});
-  }
-  return finalFile;
+  });
+}
+
+export function replaceConceptAtomic(
+  storePath: string,
+  concept: Concept,
+  beforeRename?: () => void | Promise<void>,
+): Promise<string> {
+  return writeViaTemp(storePath, concept, beforeRename, rename);
 }
 
 export interface SaveOptions {
@@ -213,4 +232,58 @@ export async function saveConcept(storePath: string, input: unknown, options: Sa
     }
     throw error;
   }
+}
+
+export type LoadOneOutcome = { ok: true; concept: Concept } | { ok: false; errors: RuleError[] };
+
+export async function loadConcept(storePath: string, id: unknown): Promise<LoadOneOutcome> {
+  if (typeof id !== "string" || !ID_PATTERN.test(id)) {
+    return { ok: false, errors: [{ path: "/id", rule: "invalid_shape", message: "must be a lowercase kebab-case id" }] };
+  }
+  const unknown = (message: string): LoadOneOutcome => ({
+    ok: false,
+    errors: [{ path: "/id", rule: "unknown_concept", message }],
+  });
+  const file = `${id}.md`;
+  let text: string;
+  try {
+    text = await readFile(join(storePath, "concepts", file), "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return unknown(`no stored concept "${id}"`);
+    throw error;
+  }
+  try {
+    const concept = parseConcept(text);
+    if (concept.id !== id) throw new Error(`id "${concept.id}" does not match the file name`);
+    return { ok: true, concept };
+  } catch (error) {
+    return unknown(`${file} cannot be read: ${(error as Error).message}`);
+  }
+}
+
+export async function extendConcept(storePath: string, input: unknown, options: SaveOptions = {}): Promise<SaveOutcome> {
+  const loaded = await loadConcept(storePath, (input as { id?: unknown } | null)?.id);
+  if (!loaded.ok) return loaded;
+  const stored = loaded.concept;
+  const { concepts } = await loadConcepts(storePath);
+
+  const errors = validateExtension(input, { stored, existingIds: new Set(concepts.map((c) => c.id)) });
+  if (errors.length > 0) return { ok: false, errors };
+
+  const added = input as {
+    relations?: Concept["relations"];
+    episodes?: Concept["episodes"];
+    recall?: { question: string }[];
+  };
+  const confirmed = options.today ?? localDate();
+  const lastQ = Math.max(0, ...stored.recall.map((q) => Number(q.id.slice(1))));
+  const recall = (added.recall ?? []).map((q, i) => ({ id: `q${lastQ + i + 1}`, question: q.question, confirmed }));
+  const merged: Concept = {
+    ...stored,
+    relations: [...stored.relations, ...(added.relations ?? [])],
+    episodes: [...stored.episodes, ...(added.episodes ?? [])],
+    recall: [...stored.recall, ...recall],
+  };
+  const file = await replaceConceptAtomic(storePath, merged, options.beforeRename);
+  return { ok: true, id: merged.id, file, recall: recall.map(({ id, confirmed }) => ({ id, confirmed })) };
 }

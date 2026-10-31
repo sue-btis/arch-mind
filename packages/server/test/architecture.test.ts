@@ -50,7 +50,7 @@ describe("architecture rules", () => {
           const names = named ? named[1]!.split(",").map((n) => n.trim().split(/\s+as\s+/)[0]!).filter(Boolean) : [];
           if (!named || names.some((n) => !readers.has(n))) offenders.push(`${relative(packagesDir, file)}: ${m[0]}`);
         }
-        if (/\bsetupStore\b|\bsaveConcept\b|\bwriteConceptAtomic\b/.test(text) && !file.endsWith("cli.ts")) {
+        if (/\bsetupStore\b|\bsaveConcept\b|\bwriteConceptAtomic\b|\breplaceConceptAtomic\b|\bextendConcept\b/.test(text) && !file.endsWith("cli.ts")) {
           offenders.push(`${relative(packagesDir, file)} (calls a rules writer)`);
         }
       }
