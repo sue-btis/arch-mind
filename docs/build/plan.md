@@ -48,7 +48,7 @@ Requirements:
 Canonical authorities:
 - `docs/design/domain.md`
 - `docs/design/architecture/architecture.dsl`
-- `docs/design/architecture/adr/` (ADR-001 to ADR-006)
+- `docs/design/architecture/adr/` (ADR-001 to ADR-007)
 - `docs/design/architecture/quality-attributes.md`
 - `docs/design/data/concept.schema.json`, `docs/design/data/facets.schema.json`
 - `docs/design/api/capture-tools.schema.json` (`list_concepts`, `save_concept`)
