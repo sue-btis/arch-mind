@@ -44,6 +44,8 @@
 | Broken concept file after a hand edit | Listed in the app with file and reason (FR-017) | Author fixes the file; next load picks it up |
 | Review log line unreadable | Server reports the line number at load | Author removes or fixes that line; history before and after it stays |
 | Store folder lost | Author notices on start | Restore from backup: the store folder is meant to live in a Git repository or a synced folder chosen by the author (human task: author confirms the store folder is backed up) |
+| Store config missing or invalid (`~/.arch-mind/config.json`) | The local server and the capture server exit at start with a message naming the config path | Run `arch-mind setup <folder>` |
+| Facet catalog missing or invalid (`facets.yaml`) | The local server exits at start, and a capture call fails, with a message naming the file | Restore the file from backup, or run `arch-mind setup <folder>` on a new folder (it never overwrites an existing `facets.yaml`) |
 | Port already in use | Command prints the error | Command retries the next port and prints the address |
 
 ## Architecture rules

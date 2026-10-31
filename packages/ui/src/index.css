@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --color-canvas: var(--canvas);
+  --color-panel: var(--panel);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-board: var(--board);
+}
+
+:root {
+  color-scheme: light dark;
+  --canvas: #f5f5f7;
+  --panel: #ffffff;
+  --line: #d2d2d7;
+  --ink: #1d1d1f;
+  --ink-muted: #5c5c61;
+  --board: #ffffff;
+  --wire: #424245;
+  --layer-client: #1d5fd1;
+  --layer-network: #0b7a6a;
+  --layer-server: #a8500a;
+  --layer-data: #7a3fbf;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #000000;
+    --panel: #1c1c1e;
+    --line: #3a3a3c;
+    --ink: #f5f5f7;
+    --ink-muted: #a1a1a6;
+    --board: #1c1c1e;
+    --wire: #c7c7cc;
+    --layer-client: #7fb0ff;
+    --layer-network: #4fd1bd;
+    --layer-server: #f0a45c;
+    --layer-data: #c39bff;
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "tnum";
+}
+
+.react-flow {
+  --xy-background-color: transparent;
+  --xy-edge-label-background-color: var(--board);
+  --xy-edge-label-color: var(--ink);
+  --xy-edge-stroke: var(--wire);
+  --xy-edge-stroke-width: 1;
+  font-family: var(--font-sans);
+}
+
+.react-flow__edge-text {
+  font-size: 11px;
+}

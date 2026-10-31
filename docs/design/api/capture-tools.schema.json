@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "arch-mind/capture-tools.schema.json",
   "title": "Capture server MCP tools",
-  "description": "Contract of the four MCP tools of the capture server (ADR-003). Each entry under $defs.tools gives the tool's inputSchema and outputSchema as published in tools/list. A failed call returns an MCP tool result with isError true and structuredContent matching $defs.rejection (FR-009 to FR-011, UX-003). Relation, episode and SEE-I shapes come from docs/design/data/concept.schema.json.",
+  "description": "Contract of the four MCP tools of the capture server (ADR-003). Each entry under $defs.tools gives the tool's inputSchema, published in tools/list, and its outputSchema, the shape of structuredContent on success. outputSchema is not published in tools/list: MCP clients validate structuredContent against it even on error results, which would hide the rejection (UX-003). A failed call returns an MCP tool result with isError true and structuredContent matching $defs.rejection (FR-009 to FR-011, UX-003). Relation, episode and SEE-I shapes come from docs/design/data/concept.schema.json.",
   "$defs": {
     "conceptId": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
     "relation": { "$ref": "concept.schema.json#/properties/relations/items" },

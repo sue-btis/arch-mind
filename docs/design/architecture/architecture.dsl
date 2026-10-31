@@ -22,6 +22,7 @@ workspace "arch-mind" "Personal architecture study tool: capture from Claude Cod
             }
             concepts = container "Concept files" "One Markdown file per concept with YAML frontmatter and the SEE-I in the body (ADR-002)." "Folder of .md files" "Store"
             reviewLog = container "Review log" "Append-only JSON Lines file, one line per review (ADR-002)." "reviews.jsonl" "Store"
+            storeConfig = container "Store config" "Holds the absolute path of the store folder as {\"storePath\": ...}; written once by arch-mind setup, read by the local server and the capture server. Either process that finds it missing or invalid exits with a message naming it." "~/.arch-mind/config.json" "Store"
             facets = container "Facet catalog" "Allowed domains and concerns; layers are fixed. Who edits it is open (PD-017)." "YAML file" "Store"
         }
 
@@ -33,6 +34,8 @@ workspace "arch-mind" "Personal architecture study tool: capture from Claude Cod
         archMind.server -> archMind.concepts "Reads"
         archMind.server -> archMind.reviewLog "Reads and appends"
         archMind.server -> archMind.facets "Reads"
+        archMind.server -> archMind.storeConfig "Reads the store folder path"
+        archMind.capture -> archMind.storeConfig "Reads the store folder path"
         archMind.capture -> archMind.concepts "Reads and writes"
         archMind.capture -> archMind.facets "Reads"
 
@@ -53,7 +56,10 @@ workspace "arch-mind" "Personal architecture study tool: capture from Claude Cod
                 deploymentNode "Claude Code" "Starts the plugin's MCP server as a child process" "Claude Code" {
                     containerInstance archMind.capture
                 }
-                deploymentNode "Store folder" "A folder chosen at plugin setup, outside project repositories" "File system" {
+                deploymentNode "Home folder" "The author's operating system home folder" "File system" {
+                    containerInstance archMind.storeConfig
+                }
+                deploymentNode "Store folder" "A folder chosen by arch-mind setup, outside project repositories" "File system" {
                     containerInstance archMind.concepts
                     containerInstance archMind.reviewLog
                     containerInstance archMind.facets
