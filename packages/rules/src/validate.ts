@@ -2,6 +2,7 @@ import {
   ID_PATTERN,
   LAYERS,
   SEE_I_PARTS,
+  type Concept,
   type Facets,
   type RejectionRule,
   type RuleError,
@@ -120,18 +121,60 @@ export function validateNewConcept(input: unknown, ctx: SaveContext): RuleError[
   if (!Array.isArray(input.recall) || input.recall.length === 0) {
     add("/recall", "no_recall", "at least one recall question is required");
   } else {
-    input.recall.forEach((item, i) => {
-      if (!isObject(item)) return add(`/recall/${i}`, "invalid_shape", "must be an object");
-      rejectUnknownKeys(item, ["question"], `/recall/${i}`, add);
-      if (isBlank(item.question)) add(`/recall/${i}/question`, "invalid_shape", "must be a non-empty string");
-    });
+    checkNewRecall(input.recall, add);
   }
   return errors;
 }
 
-function checkNewRelations(relations: unknown, ownId: unknown, ctx: SaveContext, add: Add) {
+function checkNewRecall(items: unknown[], add: Add) {
+  items.forEach((item, i) => {
+    if (!isObject(item)) return add(`/recall/${i}`, "invalid_shape", "must be an object");
+    rejectUnknownKeys(item, ["question"], `/recall/${i}`, add);
+    if (isBlank(item.question)) add(`/recall/${i}/question`, "invalid_shape", "must be a non-empty string");
+  });
+}
+
+export interface ExtendContext {
+  stored: Concept;
+  existingIds: ReadonlySet<string>;
+}
+
+const EXTEND_KEYS = ["id", "relations", "episodes", "recall"];
+
+export function validateExtension(input: unknown, ctx: ExtendContext): RuleError[] {
+  const { errors, add } = collector();
+  if (!isObject(input)) {
+    add("", "invalid_shape", "arguments must be an object");
+    return errors;
+  }
+  rejectUnknownKeys(input, EXTEND_KEYS, "", add);
+
+  if (input.relations !== undefined) {
+    const stored = ctx.stored.relations.map((r) => relationKey(r.type, r.to));
+    checkNewRelations(input.relations, ctx.stored.id, ctx, add, stored);
+  }
+  checkEpisodes(input.episodes, add);
+  if (input.recall !== undefined) {
+    if (Array.isArray(input.recall)) checkNewRecall(input.recall, add);
+    else add("/recall", "invalid_shape", "must be an array");
+  }
+
+  const hasItems = ["relations", "episodes", "recall"].some((k) => Array.isArray(input[k]) && input[k].length > 0);
+  if (!hasItems) add("", "nothing_to_add", "add at least one relation, episode or recall question");
+  return errors;
+}
+
+const relationKey = (type: string, to: string) => `${type}\n${to}`;
+
+function checkNewRelations(
+  relations: unknown,
+  ownId: unknown,
+  ctx: Pick<SaveContext, "existingIds">,
+  add: Add,
+  alreadyStored: readonly string[] = [],
+) {
   if (!Array.isArray(relations)) return add("/relations", "invalid_shape", "must be an array");
-  const seen = new Set<string>();
+  const seen = new Set<string>(alreadyStored);
   relations.forEach((rel, i) => {
     const base = `/relations/${i}`;
     if (!isObject(rel)) return add(base, "invalid_shape", "must be an object");
@@ -145,7 +188,7 @@ function checkNewRelations(relations: unknown, ownId: unknown, ctx: SaveContext,
       add(`${base}/to`, "missing_target", `no stored concept "${rel.to}"`);
     }
     if (typeof rel.type === "string" && typeof rel.to === "string") {
-      const key = `${rel.type}\n${rel.to}`;
+      const key = relationKey(rel.type, rel.to);
       if (seen.has(key)) add(base, "duplicate_relation", `relation "${rel.type}" to "${rel.to}" is repeated`);
       seen.add(key);
     }

@@ -7,10 +7,13 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { tst032Concepts, tst032RelationCount } from "../fixtures/tst-032.ts";
 import {
   StoreError,
+  extendConcept,
+  loadConcept,
   loadConcepts,
   loadConfig,
   loadFacets,
   parseConcept,
+  replaceConceptAtomic,
   saveConcept,
   serializeConcept,
   setupStore,
@@ -271,5 +274,162 @@ describe("store", () => {
     await writeFile(join(store, "concepts", "broken.md"), "garbage");
     const out = await saveConcept(store, valid({ id: "broken" }));
     expect(out).toMatchObject({ ok: false, errors: [{ rule: "duplicate_id" }] });
+  });
+});
+
+describe("extend and replace (TST-010, AC-2, AC-3, AC-4)", () => {
+  let dir: string;
+  let store: string;
+  const base = (over: Record<string, unknown> = {}) => ({
+    id: "alpha",
+    title: "Alpha",
+    layer: "server",
+    domains: ["web"],
+    concerns: ["security"],
+    seeI: { statement: "s", elaboration: "e", example: "x", illustration: "i" },
+    relations: [{ type: "uses", to: "beta", source: "RFC 1", explanation: "because" }],
+    episodes: [{ project: "p", situation: "saw it" }],
+    recall: [{ question: "one" }, { question: "two" }, { question: "three" }],
+    ...over,
+  });
+  const alphaFile = () => join(store, "concepts", "alpha.md");
+  const concepts = () => readdir(join(store, "concepts"));
+
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), "arch-mind-extend-"));
+    store = join(dir, "store");
+    await setupStore(store, join(dir, "home", ".arch-mind", "config.json"));
+    await saveConcept(store, base({ id: "beta", relations: [], episodes: undefined, recall: [{ question: "b" }] }));
+    await saveConcept(store, base({ id: "gamma", relations: [], episodes: undefined, recall: [{ question: "g" }] }));
+    await saveConcept(store, base(), { today: "2026-01-02" });
+    // Hand-deleting q2 leaves q1,q3 stored: the next id must follow the highest, not the count.
+    const stored = await readFile(alphaFile(), "utf8");
+    await writeFile(alphaFile(), stored.replace(/ {2}- id: q2\n.*\n.*\n/, ""));
+  });
+  afterEach(() => rm(dir, { recursive: true, force: true }));
+
+  it("loadConcept returns the stored concept and reports unknown and unreadable ids as unknown_concept at /id", async () => {
+    const out = await loadConcept(store, "alpha");
+    expect(out).toMatchObject({ ok: true, concept: { id: "alpha", recall: [{ id: "q1" }, { id: "q3" }] } });
+    expect(await loadConcept(store, "ghost")).toMatchObject({ ok: false, errors: [{ path: "/id", rule: "unknown_concept" }] });
+    await writeFile(join(store, "concepts", "broken.md"), "garbage");
+    expect(await loadConcept(store, "broken")).toMatchObject({
+      ok: false,
+      errors: [{ path: "/id", rule: "unknown_concept", message: expect.stringContaining("broken.md") }],
+    });
+  });
+
+  it("adds relations, an episode and recall questions, keeps stored fields, and numbers recall after the highest q", async () => {
+    const before = (await loadConcept(store, "alpha")) as { concept: Concept };
+    const out = await extendConcept(
+      store,
+      {
+        id: "alpha",
+        relations: [{ type: "uses", to: "gamma", source: "RFC 2", explanation: "why" }],
+        episodes: [{ project: "q", situation: "again", date: "2026-10-31" }],
+        recall: [{ question: "four" }, { question: "five" }],
+      },
+      { today: "2026-10-31" },
+    );
+    expect(out).toEqual({
+      ok: true,
+      id: "alpha",
+      file: alphaFile(),
+      recall: [
+        { id: "q4", confirmed: "2026-10-31" },
+        { id: "q5", confirmed: "2026-10-31" },
+      ],
+    });
+    const after = ((await loadConcept(store, "alpha")) as { concept: Concept }).concept;
+    expect(after).toMatchObject({
+      id: before.concept.id,
+      title: before.concept.title,
+      layer: before.concept.layer,
+      domains: before.concept.domains,
+      concerns: before.concept.concerns,
+      seeI: before.concept.seeI,
+    });
+    expect(after.relations).toEqual([...before.concept.relations, { type: "uses", to: "gamma", source: "RFC 2", explanation: "why" }]);
+    expect(after.episodes).toHaveLength(2);
+    expect(after.recall.map((q) => q.id)).toEqual(["q1", "q3", "q4", "q5"]);
+    expect(after.recall.slice(0, 2)).toEqual(before.concept.recall);
+    expect(validConcept(after), JSON.stringify(validConcept.errors)).toBe(true);
+    expect(await concepts()).toEqual(["alpha.md", "beta.md", "gamma.md"]);
+  });
+
+  const rejections: [string, Record<string, unknown>, string][] = [
+    ["unknown_concept@/id", { id: "ghost", recall: [{ question: "x" }] }, "ghost"],
+    ["duplicate_relation@/relations/0", { id: "alpha", relations: [{ type: "uses", to: "beta", source: "s", explanation: "e" }] }, "alpha"],
+    [
+      "duplicate_relation@/relations/1",
+      {
+        id: "alpha",
+        relations: [
+          { type: "uses", to: "gamma", source: "s", explanation: "e" },
+          { type: "uses", to: "gamma", source: "s", explanation: "e" },
+        ],
+      },
+      "alpha",
+    ],
+    ["missing_source@/relations/0/source", { id: "alpha", relations: [{ type: "a", to: "gamma", explanation: "e" }] }, "alpha"],
+    ["missing_target@/relations/0/to", { id: "alpha", relations: [{ type: "a", to: "ghost", source: "s", explanation: "e" }] }, "alpha"],
+    ["missing_target@/relations/0/to", { id: "alpha", relations: [{ type: "a", to: "alpha", source: "s", explanation: "e" }] }, "alpha"],
+    ["nothing_to_add@", { id: "alpha" }, "alpha"],
+    ["nothing_to_add@", { id: "alpha", relations: [], episodes: [], recall: [] }, "alpha"],
+    ["invalid_shape@/title", { id: "alpha", title: "New", recall: [{ question: "x" }] }, "alpha"],
+    ["invalid_shape@/recall/0/question", { id: "alpha", recall: [{ question: " " }] }, "alpha"],
+  ];
+  it.each(rejections)("rejects with %s and leaves the file byte-identical", async (pair, input, id) => {
+    const target = join(store, "concepts", `${id}.md`);
+    const before = await readFile(target, "utf8").catch(() => null);
+    const out = await extendConcept(store, input);
+    expect(out.ok).toBe(false);
+    const pairs = out.ok ? [] : out.errors.map((e) => `${e.rule}@${e.path}`);
+    expect(pairs).toContain(pair);
+    expect(await readFile(target, "utf8").catch(() => null)).toBe(before);
+    expect(await concepts()).toEqual(["alpha.md", "beta.md", "gamma.md"]);
+  });
+
+  it("collects every failed rule in one rejection", async () => {
+    const out = await extendConcept(store, {
+      id: "alpha",
+      relations: [{ type: "uses", to: "beta", source: "s", explanation: "e" }, { type: "x", to: "ghost", explanation: "e" }],
+    });
+    expect(out.ok ? [] : out.errors.map((e) => `${e.rule}@${e.path}`).sort()).toEqual([
+      "duplicate_relation@/relations/0",
+      "missing_source@/relations/1/source",
+      "missing_target@/relations/1/to",
+    ]);
+  });
+
+  it("keeps the old file and no visible temp file when interrupted between the temporary write and the rename", async () => {
+    const before = await readFile(alphaFile(), "utf8");
+    const boom = new Error("killed");
+    let during: string[] = [];
+    await expect(
+      extendConcept(
+        store,
+        { id: "alpha", recall: [{ question: "four" }] },
+        {
+          beforeRename: async () => {
+            during = await concepts();
+            const loaded = await loadConcepts(store);
+            expect(loaded.problems).toEqual([]);
+            expect(loaded.concepts.find((c) => c.id === "alpha")?.recall).toHaveLength(2);
+            throw boom;
+          },
+        },
+      ),
+    ).rejects.toBe(boom);
+    expect(during.filter((n) => n.endsWith(".tmp"))).toHaveLength(1);
+    expect(await readFile(alphaFile(), "utf8")).toBe(before);
+    expect(await concepts()).toEqual(["alpha.md", "beta.md", "gamma.md"]);
+  });
+
+  it("replaceConceptAtomic replaces an existing file and leaves only the new one (ASM-1)", async () => {
+    const current = ((await loadConcept(store, "alpha")) as { concept: Concept }).concept;
+    await replaceConceptAtomic(store, { ...current, title: "Replaced" });
+    expect(((await loadConcept(store, "alpha")) as { concept: Concept }).concept.title).toBe("Replaced");
+    expect(await concepts()).toEqual(["alpha.md", "beta.md", "gamma.md"]);
   });
 });

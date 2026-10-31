@@ -61,9 +61,9 @@ afterAll(async () => {
 });
 
 describe("capture server contract (TST-003, AC-3, AC-4)", () => {
-  it("publishes list_concepts and save_concept with schemas that accept contract-valid arguments", async () => {
+  it("publishes the four capture tools with schemas that accept contract-valid arguments", async () => {
     const { tools } = await client.listTools();
-    expect(tools.map((t) => t.name).sort()).toEqual(["list_concepts", "save_concept"]);
+    expect(tools.map((t) => t.name).sort()).toEqual(["extend_concept", "get_concept", "list_concepts", "save_concept"]);
     const save = tools.find((t) => t.name === "save_concept")!;
     const published = ajv.compile(save.inputSchema as object);
     expect(published(complete())).toBe(true);
@@ -139,6 +139,130 @@ describe("capture server contract (TST-003, AC-3, AC-4)", () => {
     const bad = await client.callTool({ name: "save_concept", arguments: { id: 7 } });
     expect(bad.isError).toBe(true);
     expect(schemaAt("/$defs/rejection")(bad.structuredContent)).toBe(true);
+  });
+});
+
+describe("get_concept and extend_concept (TST-009, AC-1, AC-2, AC-3, AC-6)", () => {
+  const call = (name: string, args: unknown) => client.callTool({ name, arguments: args as Record<string, unknown> });
+  const fileText = (id: string) => readFile(join(store, "concepts", `${id}.md`), "utf8");
+
+  it("publishes get_concept and extend_concept without an outputSchema, accepting contract-valid arguments", async () => {
+    const { tools } = await client.listTools();
+    expect(tools.every((t) => t.outputSchema === undefined)).toBe(true);
+    const get = ajv.compile(tools.find((t) => t.name === "get_concept")!.inputSchema as object);
+    expect(get({ id: "https" })).toBe(true);
+    expect(get({})).toBe(false);
+    const extend = ajv.compile(tools.find((t) => t.name === "extend_concept")!.inputSchema as object);
+    const contract = schemaAt("/$defs/tools/extend_concept/inputSchema");
+    const args = {
+      id: "https",
+      relations: [{ type: "uses", to: "tls", source: "RFC 8446", explanation: "why" }],
+      episodes: [{ project: "p", situation: "s", date: "2026-10-31" }],
+      recall: [{ question: "q?" }],
+    };
+    expect(extend(args)).toBe(true);
+    expect(contract(args)).toBe(true);
+    expect(extend({ id: "https", title: "x" })).toBe(false);
+  });
+
+  it("get_concept returns the stored concept matching concept.schema.json, and unknown_concept for a missing id", async () => {
+    const res = await call("get_concept", { id: "https" });
+    expect(res.isError).toBeFalsy();
+    const validate = ajv.getSchema("arch-mind/concept.schema.json")!;
+    expect(validate(res.structuredContent), JSON.stringify(validate.errors)).toBe(true);
+    const stored = (await loadConcepts(store)).concepts.find((c) => c.id === "https");
+    expect(res.structuredContent).toEqual(JSON.parse(JSON.stringify(stored)));
+
+    const missing = await call("get_concept", { id: "ghost" });
+    expect(missing.isError).toBe(true);
+    expect(schemaAt("/$defs/rejection")(missing.structuredContent)).toBe(true);
+    expect(missing.structuredContent).toMatchObject({ errors: [{ path: "/id", rule: "unknown_concept" }] });
+  });
+
+  it("extend_concept adds a relation, an episode and a recall question and reports only the added question", async () => {
+    await call("save_concept", complete({ id: "tls", title: "TLS", recall: [{ question: "t?" }] }));
+    const res = await call("extend_concept", {
+      id: "https",
+      relations: [{ type: "uses", to: "tls", source: "RFC 8446", explanation: "HTTPS runs over TLS" }],
+      episodes: [{ project: "web", situation: "saw the handshake" }],
+      recall: [{ question: "What does TLS add?" }],
+    });
+    expect(res.isError).toBeFalsy();
+    const validate = schemaAt("/$defs/tools/extend_concept/outputSchema");
+    expect(validate(res.structuredContent), JSON.stringify(validate.errors)).toBe(true);
+    const out = res.structuredContent as { recall: { id: string }[] };
+    expect(out.recall.map((q) => q.id)).toEqual(["q3"]);
+    const stored = (await loadConcepts(store)).concepts.find((c) => c.id === "https")!;
+    expect(stored.title).toBe("HTTPS");
+    expect(stored.relations).toHaveLength(1);
+    expect(stored.episodes).toHaveLength(1);
+    expect(stored.recall.map((q) => q.id)).toEqual(["q1", "q2", "q3"]);
+  });
+
+  it.each([
+    ["unknown_concept", "/id", { id: "ghost", recall: [{ question: "x" }] }],
+    ["duplicate_relation", "/relations/0", { id: "https", relations: [{ type: "uses", to: "tls", source: "s", explanation: "e" }] }],
+    ["missing_source", "/relations/0/source", { id: "https", relations: [{ type: "a", to: "tls", explanation: "e" }] }],
+    ["missing_target", "/relations/0/to", { id: "https", relations: [{ type: "a", to: "ghost", source: "s", explanation: "e" }] }],
+    ["nothing_to_add", "", { id: "https" }],
+    ["invalid_shape", "/title", { id: "https", title: "New", recall: [{ question: "x" }] }],
+  ])("extend_concept rejects %s at %j with a contract-valid rejection and writes nothing", async (rule, path, args) => {
+    const before = await fileText("https");
+    const res = await call("extend_concept", args);
+    expect(res.isError).toBe(true);
+    const validate = schemaAt("/$defs/rejection");
+    expect(validate(res.structuredContent), JSON.stringify(validate.errors)).toBe(true);
+    expect((res.structuredContent as { errors: { path: string; rule: string }[] }).errors).toContainEqual(
+      expect.objectContaining({ rule, path }),
+    );
+    expect(await fileText("https")).toBe(before);
+  });
+});
+
+describe("guided capture transcript (TST-011, AC-5)", () => {
+  const proposals = {
+    relations: [
+      { type: "requires", to: "https", source: "RFC 9110 section 4.2.2", explanation: "" },
+      { type: "uses", to: "tls", source: "RFC 8446", explanation: "" },
+    ],
+    seeI: {
+      statement: "Claude draft statement.",
+      elaboration: "Claude draft elaboration.",
+      example: "Claude draft example.",
+      illustration: "Claude draft illustration.",
+    },
+    recall: ["Claude question A?", "Claude question B?", "Claude question C?"],
+  };
+  const author = {
+    acceptedRelation: { ...proposals.relations[0]!, explanation: "I wrote this sentence myself." },
+    rewrittenIllustration: "A sealed envelope the author described.",
+    acceptedQuestions: [proposals.recall[0]!, proposals.recall[2]!],
+  };
+
+  it("saves only the relation the author kept, the SEE-I part the author rewrote and the confirmed questions", async () => {
+    const res = await client.callTool({
+      name: "save_concept",
+      arguments: {
+        id: "hsts",
+        title: "HSTS",
+        layer: "network",
+        domains: ["web"],
+        concerns: ["security"],
+        seeI: { ...proposals.seeI, illustration: author.rewrittenIllustration },
+        relations: [author.acceptedRelation],
+        recall: author.acceptedQuestions.map((question) => ({ question })),
+      },
+    });
+    expect(res.isError).toBeFalsy();
+    const text = await readFile(join(store, "concepts", "hsts.md"), "utf8");
+    expect(text).toContain("I wrote this sentence myself.");
+    expect(text).toContain(author.rewrittenIllustration);
+    expect(text).not.toContain("Claude draft illustration.");
+    expect(text).not.toContain("RFC 8446");
+    expect(text).not.toContain("Claude question B?");
+    const stored = (await loadConcepts(store)).concepts.find((c) => c.id === "hsts")!;
+    expect(stored.relations).toEqual([author.acceptedRelation]);
+    expect(stored.recall.map((q) => q.question)).toEqual(["Claude question A?", "Claude question C?"]);
   });
 });
 
