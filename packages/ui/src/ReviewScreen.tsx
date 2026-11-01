@@ -79,12 +79,19 @@ export function ReviewScreen({ titles, onOpenConcept }: { titles: Map<string, st
         <h2 id="review-title" className="text-[17px] font-semibold tracking-tight">
           Review
         </h2>
-        <p className="text-ink-muted" data-testid="due-count" aria-live="polite">
-          {queue ? dueHeading(queue.length) : ""}
+        <p className="tabular-nums text-ink-muted">
+          <span data-testid="due-count" aria-live="polite">
+            {queue ? dueHeading(queue.length) : ""}
+          </span>
+          {queue && current && (
+            <span data-testid="question-position">
+              {" · "}Question {index + 1} of {queue.length}
+            </span>
+          )}
         </p>
       </div>
       {error && (
-        <p role="alert">
+        <p role="alert" className="text-correction">
           {queue ? "Something went wrong" : "Could not load the due questions"}: {error}
         </p>
       )}
@@ -93,14 +100,9 @@ export function ReviewScreen({ titles, onOpenConcept }: { titles: Map<string, st
 
       {queue && current && (
         <div className="flex flex-col gap-4" data-testid="review-question">
-          <div>
-            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-widest text-ink-muted">
-              Question {index + 1} of {queue.length} · {titles.get(current.conceptId) ?? current.conceptId}
-            </p>
-            <h3 ref={heading} tabIndex={-1} className="text-[15px] font-medium">
-              {current.text}
-            </h3>
-          </div>
+          <h3 ref={heading} tabIndex={-1} className="text-[15px] font-medium">
+            {current.text}
+          </h3>
 
           {!answer && !marked && (
             <div>
@@ -111,7 +113,8 @@ export function ReviewScreen({ titles, onOpenConcept }: { titles: Map<string, st
           )}
 
           {answer && (
-            <div className="flex flex-col gap-4" data-testid="review-answer">
+            <div className="reveal-in flex flex-col gap-4" data-testid="review-answer">
+              <p className="font-semibold">{answer.title}</p>
               <section aria-labelledby="review-see-i">
                 <h3 id="review-see-i" className={SECTION_TITLE}>
                   SEE-I
@@ -132,7 +135,7 @@ export function ReviewScreen({ titles, onOpenConcept }: { titles: Map<string, st
                   {answer.relations.map((r) => (
                     <li key={`${r.type}>${r.to}`}>
                       <p className="font-medium">
-                        {r.type} to {titles.get(r.to) ?? r.to}
+                        {r.type} → {titles.get(r.to) ?? r.to}
                       </p>
                       <p>{r.explanation}</p>
                     </li>
@@ -154,7 +157,7 @@ export function ReviewScreen({ titles, onOpenConcept }: { titles: Map<string, st
 
           {marked && (
             <div className="flex flex-col gap-3" role="status" data-testid="review-result">
-              <p className="font-medium">
+              <p className={`font-medium tabular-nums ${marked.result === "wrong" ? "text-correction" : ""}`}>
                 Marked {marked.result}. {boxLabel(marked.state)}
               </p>
               <div className="flex gap-2">

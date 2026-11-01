@@ -37,8 +37,15 @@ export interface LayoutNode {
   height: number;
 }
 
+interface LabelBox {
+  at: Point;
+  halfWidth: number;
+  halfHeight: number;
+}
+
 export interface LayoutBand {
   layer: Layer;
+  empty: boolean;
   y: number;
   height: number;
 }
@@ -127,17 +134,18 @@ export async function layoutConcepts(concepts: Concept[]): Promise<Layout> {
   LAYERS.forEach((layer, i) => {
     const extent = extents[i];
     if (extent) {
-      bands.push({ layer, y: extent.top + shiftAt(extent.top) - origin, height: extent.bottom - extent.top });
+      bands.push({ layer, empty: false, y: extent.top + shiftAt(extent.top) - origin, height: extent.bottom - extent.top });
       previousBottom = extent.bottom;
     } else {
       const cut = previousBottom + BAND_GAP;
-      bands.push({ layer, y: cut + shiftAt(cut) - origin, height: EMPTY_BAND_HEIGHT });
+      bands.push({ layer, empty: true, y: cut + shiftAt(cut) - origin, height: EMPTY_BAND_HEIGHT });
       cuts.push(cut);
       previousBottom = cut - BAND_GAP;
     }
   });
 
   const nodes = raw.map((n) => ({ ...n, y: n.y + shiftAt(n.y) - origin }));
+  const placed: LabelBox[] = [];
   const edges = relations.map((r, i): LayoutEdge => {
     const section = (solved.edges as ElkExtendedEdge[] | undefined)?.find((e) => e.id === `e${i}`)?.sections?.[0];
     const points = section
@@ -154,7 +162,7 @@ export async function layoutConcepts(concepts: Concept[]): Promise<Layout> {
       citation: r.citation,
       explanation: r.explanation,
       points,
-      labelAt: labelPoint(points, r.label, nodes),
+      labelAt: labelPoint(points, r.label, nodes, placed),
     };
   });
 
@@ -163,28 +171,38 @@ export async function layoutConcepts(concepts: Concept[]): Promise<Layout> {
   return { width: Math.max(width, 2 * MARGIN), height: last.y + last.height, nodes, bands, edges };
 }
 
-// Candidate spots run along the longest segments first; the first one whose text box
-// clears every connector wins, otherwise the middle of the longest segment.
-function labelPoint(points: Point[], label: string, nodes: LayoutNode[]): Point {
+// Candidate spots run along the longest segments first; the first one whose text box clears every
+// node, every bend of its own wire and every label already placed wins, otherwise the middle of the
+// longest segment. Short horizontal runs are skipped so the box does not swallow the whole run.
+function labelPoint(points: Point[], label: string, nodes: LayoutNode[], placed: LabelBox[]): Point {
   const segments = points
     .slice(1)
     .map((b, i) => ({ a: points[i]!, b }))
     .sort((s1, s2) => length(s2) - length(s1));
   const halfWidth = label.length * 3.4 + 6;
   const halfHeight = 9;
+  const bends = points.slice(1, -1);
   const clear = (p: Point) =>
     nodes.every(
       (n) =>
         p.x + halfWidth < n.x || p.x - halfWidth > n.x + n.width || p.y + halfHeight < n.y || p.y - halfHeight > n.y + n.height,
-    );
+    ) &&
+    bends.every((bend) => Math.abs(bend.x - p.x) > halfWidth || Math.abs(bend.y - p.y) > halfHeight) &&
+    placed.every((o) => Math.abs(o.at.x - p.x) > o.halfWidth + halfWidth || Math.abs(o.at.y - p.y) > o.halfHeight + halfHeight);
   for (const { a, b } of segments) {
-    for (const t of [0.5, 0.3, 0.7]) {
+    if (a.y === b.y && Math.abs(b.x - a.x) < 2 * halfWidth + 16) continue;
+    for (const t of [0.5, 0.3, 0.7, 0.2, 0.8, 0.1, 0.9]) {
       const p = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
-      if (clear(p)) return p;
+      if (clear(p)) {
+        placed.push({ at: p, halfWidth, halfHeight });
+        return p;
+      }
     }
   }
   const first = segments[0];
-  return first ? { x: (first.a.x + first.b.x) / 2, y: (first.a.y + first.b.y) / 2 } : { x: 0, y: 0 };
+  const fallback = first ? { x: (first.a.x + first.b.x) / 2, y: (first.a.y + first.b.y) / 2 } : { x: 0, y: 0 };
+  placed.push({ at: fallback, halfWidth, halfHeight });
+  return fallback;
 }
 
 function length({ a, b }: { a: Point; b: Point }) {

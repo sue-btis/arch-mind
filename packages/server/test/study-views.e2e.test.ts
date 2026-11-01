@@ -148,7 +148,7 @@ describe.each(["light", "dark"] as const)("matrix view at 1366 x 768, %s mode (A
       expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
       if (shotDir) {
         await mkdir(shotDir, { recursive: true });
-        await page.screenshot({ path: join(shotDir, `matrix-view-1366x768-${scheme}.png`), fullPage: true });
+        await page.screenshot({ path: join(shotDir, `matrix-view-1366x768-${scheme}.png`), fullPage: true, animations: "disabled" });
       }
     } finally {
       await close();
@@ -251,7 +251,7 @@ describe.each(["light", "dark"] as const)("concept detail at 1366 x 768, %s mode
       expect(text).toContain(secureAttr.recall[0]!.question);
       if (shotDir) {
         await mkdir(shotDir, { recursive: true });
-        await page.screenshot({ path: join(shotDir, `concept-detail-1366x768-${scheme}.png`) });
+        await page.screenshot({ path: join(shotDir, `concept-detail-1366x768-${scheme}.png`), animations: "disabled" });
       }
 
       await page.keyboard.press("Escape");

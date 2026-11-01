@@ -1,15 +1,27 @@
 import type { Concept } from "@arch-mind/rules/model";
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { FitMessage } from "./FitMessage.tsx";
 import type { OpenConcept } from "./LayerView.tsx";
 import { CELL_SIZE, ROW_HEADER_WIDTH, buildMatrix, matrixWidth } from "./matrix.ts";
 import { RelationPopover, useRelationPopover, type RelationTargetProps } from "./Popover.tsx";
+import { wireAbbrev, wireCode, wireStyle, type WireCode } from "./wire-code.ts";
 
-export function MatrixView({ concepts, boardWidth, onOpen }: { concepts: Concept[]; boardWidth: number; onOpen: OpenConcept }) {
+export function MatrixView({
+  concepts,
+  boardWidth,
+  onOpen,
+  onMeasure,
+}: {
+  concepts: Concept[];
+  boardWidth: number;
+  onOpen: OpenConcept;
+  onMeasure: (needed: number) => void;
+}) {
   const matrix = useMemo(() => buildMatrix(concepts), [concepts]);
   const container = useRef<HTMLDivElement>(null);
   const { open, targetProps } = useRelationPopover(container);
   const needed = matrixWidth(matrix.headers.length);
+  useEffect(() => onMeasure(needed), [needed, onMeasure]);
 
   if (boardWidth > 0 && needed > boardWidth) return <FitMessage count={concepts.length} needed={needed} available={boardWidth} />;
   const label = (i: number) => `${matrix.headers[i]!.designator} ${matrix.headers[i]!.title}`;
@@ -33,7 +45,7 @@ export function MatrixView({ concepts, boardWidth, onOpen }: { concepts: Concept
                   className="block whitespace-nowrap px-1 py-1.5 text-left"
                   style={{ writingMode: "vertical-rl", transform: "rotate(180deg)", margin: "0 auto" }}
                 >
-                  <span className="text-[11px] font-semibold" style={{ color: `var(--layer-${h.layer})` }}>
+                  <span className="text-[11px] font-semibold tabular-nums" style={{ color: `var(--layer-${h.layer})` }}>
                     {h.designator}
                   </span>{" "}
                   {h.title}
@@ -49,10 +61,9 @@ export function MatrixView({ concepts, boardWidth, onOpen }: { concepts: Concept
                 <button
                   type="button"
                   className="flex h-8 w-full items-center gap-2 bg-board px-2.5 text-left"
-                  style={{ borderLeft: `3px solid var(--layer-${row.layer})` }}
                   onClick={(e) => onOpen(row.id, e.currentTarget)}
                 >
-                  <span className="text-[11px] font-semibold" style={{ color: `var(--layer-${row.layer})` }}>
+                  <span className="text-[11px] font-semibold tabular-nums" style={{ color: `var(--layer-${row.layer})` }}>
                     {row.designator}
                   </span>
                   <span className="truncate">{row.title}</span>
@@ -66,6 +77,7 @@ export function MatrixView({ concepts, boardWidth, onOpen }: { concepts: Concept
                       <RelationCell
                         label={`${relations.map((x) => x.type).join(", ")}: ${label(r)} to ${label(c)}`}
                         count={relations.length}
+                        code={relations.length === 1 ? wireCode(relations[0]!.type) : null}
                         props={targetProps(
                           `${row.id}>${col.id}`,
                           relations.map((x) => ({ type: x.type, from: label(r), to: label(c), source: x.source, explanation: x.explanation })),
@@ -84,11 +96,15 @@ export function MatrixView({ concepts, boardWidth, onOpen }: { concepts: Concept
   );
 }
 
-function RelationCell({ label, count, props }: { label: string; count: number; props: RelationTargetProps }) {
+function RelationCell({ label, count, code, props }: { label: string; count: number; code: WireCode | null; props: RelationTargetProps }) {
+  const { stroke, strokeDasharray } = wireStyle(code);
   return (
     <button type="button" data-relation-target aria-label={label} className="flex h-8 w-full items-center justify-center" {...props}>
-      <span className="flex h-3 min-w-3 items-center justify-center bg-[var(--wire)] px-0.5 text-[9px] font-semibold text-board">
-        {count > 1 ? count : ""}
+      <span
+        className={`flex h-4 min-w-6 items-center justify-center px-0.5 text-[9px] font-semibold tabular-nums ${strokeDasharray ? "text-ink" : "text-board"}`}
+        style={strokeDasharray ? { border: `1px dashed ${stroke}` } : { background: stroke }}
+      >
+        {count > 1 ? count : code ? wireAbbrev(code) : ""}
       </span>
     </button>
   );

@@ -53,7 +53,7 @@ describe.each(["light", "dark"] as const)("layer view at 1366 x 768, %s mode (TS
           connectors: document.querySelectorAll(".react-flow__node-connector").length,
           edges: document.querySelectorAll(".react-flow__edge").length,
           labels: [...document.querySelectorAll(".react-flow__edge-text")].map((e) => e.textContent),
-          bands: [...document.querySelectorAll(".react-flow__node-band")].map((b) => ({ name: b.textContent, top: rect(b).top, bottom: rect(b).bottom })),
+          bands: [...document.querySelectorAll(".react-flow__node-band")].map((b) => ({ name: b.querySelector("[data-band-name]")?.textContent, top: rect(b).top, bottom: rect(b).bottom })),
           nodeRights: [...document.querySelectorAll(".react-flow__node-connector")].map((n) => rect(n).right),
           fonts: getComputedStyle(document.body).fontFamily,
         };
@@ -74,7 +74,7 @@ describe.each(["light", "dark"] as const)("layer view at 1366 x 768, %s mode (TS
 
       if (shotDir) {
         await mkdir(shotDir, { recursive: true });
-        await page.screenshot({ path: join(shotDir, `layer-view-1366x768-${scheme}.png`), fullPage: true });
+        await page.screenshot({ path: join(shotDir, `layer-view-1366x768-${scheme}.png`), fullPage: true, animations: "disabled" });
       }
     } finally {
       await context.close();

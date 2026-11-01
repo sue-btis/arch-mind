@@ -44,7 +44,7 @@ export function ConceptDetail({ id, titles, onClose }: { id: string; titles: Map
       aria-labelledby="concept-detail-title"
       tabIndex={-1}
       data-testid="concept-detail"
-      className="fixed bottom-4 right-4 top-4 z-30 w-[420px] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-2xl border border-line bg-panel p-4 text-[13px] shadow-lg"
+      className="sheet-in fixed bottom-4 right-4 top-4 z-30 w-[420px] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-2xl border border-line bg-panel p-4 text-[13px] shadow-lg"
     >
       <div className="flex items-start justify-between gap-3">
         <h2 id="concept-detail-title" className="text-[17px] font-semibold tracking-tight">
@@ -55,7 +55,7 @@ export function ConceptDetail({ id, titles, onClose }: { id: string; titles: Map
         </button>
       </div>
       {error && (
-        <p role="alert" className="mt-3">
+        <p role="alert" className="mt-3 text-correction">
           Could not load this concept: {error}
         </p>
       )}
@@ -92,7 +92,7 @@ export function ConceptDetail({ id, titles, onClose }: { id: string; titles: Map
               {concept.relations.map((r) => (
                 <li key={`${r.type}>${r.to}`}>
                   <p className="font-medium">
-                    {r.type} to {titles.get(r.to) ?? r.to}
+                    {r.type} → {titles.get(r.to) ?? r.to}
                   </p>
                   <p className="text-ink-muted">Source: {r.source}</p>
                   <p>{r.explanation}</p>
@@ -111,7 +111,7 @@ export function ConceptDetail({ id, titles, onClose }: { id: string; titles: Map
                 <li key={i}>
                   <p className="font-medium">
                     {e.project}
-                    {e.date ? ` · ${e.date}` : ""}
+                    {e.date && <span className="tabular-nums"> · {e.date}</span>}
                   </p>
                   <p>{e.situation}</p>
                 </li>
@@ -127,7 +127,7 @@ export function ConceptDetail({ id, titles, onClose }: { id: string; titles: Map
               {detail.questions.map((q) => (
                 <li key={q.question}>
                   <p>{q.text}</p>
-                  <p className="text-ink-muted">
+                  <p className="tabular-nums text-ink-muted">
                     Box {q.box} · due {q.due}
                   </p>
                 </li>
