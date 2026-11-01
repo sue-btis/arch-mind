@@ -30,6 +30,7 @@ export function App() {
   const [view, setView] = useState<View>("layers");
   const [selected, setSelected] = useState<string | null>(null);
   const [boardWidth, setBoardWidth] = useState(0);
+  const [needed, setNeeded] = useState<number | null>(null);
   const board = useRef<HTMLDivElement>(null);
   const opener = useRef<HTMLElement | null>(null);
 
@@ -71,12 +72,12 @@ export function App() {
     <main className="mx-auto flex max-w-[1366px] flex-col gap-3 p-4">
       <header className="flex items-baseline justify-between px-1">
         <h1 className="text-[15px] font-semibold tracking-tight">arch-mind</h1>
-        <p className="text-[13px] text-ink-muted">
+        <p className="text-[13px] tabular-nums text-ink-muted">
           {data ? `${data.concepts.length} concepts · ${relations} relations` : ""}
-          {data && data.problems.length > 0 ? ` · ${data.problems.length} files could not be read` : ""}
+          {data && data.problems.length > 0 ? ` · ${data.problems.length} ${data.problems.length === 1 ? "file" : "files"} could not be read` : ""}
         </p>
       </header>
-      {error && <p role="alert">Could not load concepts: {error}</p>}
+      {error && <p role="alert" className="text-correction">Could not load concepts: {error}</p>}
       <div className="flex items-start gap-3">
         {data && <Sidebar facets={data.facets} filters={filters} onChange={setFilters} problems={data.problems} />}
         <div className="flex min-w-0 flex-1 flex-col gap-3">
@@ -94,13 +95,14 @@ export function App() {
                 </button>
               ))}
             </div>
-            <p className="text-[13px] text-ink-muted" aria-live="polite">
+            <p className="text-[13px] tabular-nums text-ink-muted" aria-live="polite">
               {data && view !== "review" ? `${shown.length} of ${data.concepts.length} concepts shown` : ""}
+              {data && view !== "review" && needed !== null && boardWidth > 0 ? ` · uses ${Math.round((needed / boardWidth) * 100)} % of the board` : ""}
             </p>
           </div>
           <div ref={board} hidden={view === "review"} className="border border-line bg-board" data-testid="board" data-view={view}>
-            {data && view === "layers" && <LayerView concepts={shown} boardWidth={boardWidth} onOpen={open} />}
-            {data && view === "matrix" && <MatrixView concepts={shown} boardWidth={boardWidth} onOpen={open} />}
+            {data && view === "layers" && <LayerView concepts={shown} boardWidth={boardWidth} onOpen={open} onMeasure={setNeeded} />}
+            {data && view === "matrix" && <MatrixView concepts={shown} boardWidth={boardWidth} onOpen={open} onMeasure={setNeeded} />}
           </div>
           {view === "review" && <ReviewScreen titles={titles} onOpenConcept={open} />}
         </div>

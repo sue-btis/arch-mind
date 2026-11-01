@@ -96,7 +96,7 @@ export function RelationPopover({ open, container }: { open: Open | null; contai
       ref={ref}
       role="tooltip"
       data-testid="relation-popover"
-      className="pointer-events-none absolute z-20 w-80 rounded-xl border border-line bg-panel p-3 text-[13px] shadow-lg"
+      className="popover-in pointer-events-none absolute z-20 w-80 rounded-xl border border-line bg-panel p-3 text-[13px] shadow-lg"
       style={{ left, top: open.y + 14 }}
     >
       {open.relations.map((r, i) => (

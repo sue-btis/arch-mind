@@ -68,4 +68,23 @@ describe("layer view layout (TST-008 geometry, AC-7, AC-8)", () => {
     const out = await layoutConcepts(overWideConcepts);
     expect(out.width).toBeGreaterThan(MAX_WIDTH);
   });
+
+  it("keeps every label off the bends of its own wire and off other labels", async () => {
+    const out = await layoutConcepts(tst032Concepts);
+    const halfHeight = 9;
+    const half = (label: string) => label.length * 3.4 + 6;
+    for (const e of out.edges) {
+      for (const bend of e.points.slice(1, -1)) {
+        const covered = Math.abs(bend.x - e.labelAt.x) <= half(e.label) && Math.abs(bend.y - e.labelAt.y) <= halfHeight;
+        expect(covered, `${e.id} ${e.label} covers a bend`).toBe(false);
+      }
+    }
+    for (const [i, a] of out.edges.entries()) {
+      for (const b of out.edges.slice(i + 1)) {
+        const overlap =
+          Math.abs(a.labelAt.x - b.labelAt.x) <= half(a.label) + half(b.label) && Math.abs(a.labelAt.y - b.labelAt.y) <= 2 * halfHeight;
+        expect(overlap, `${a.id} and ${b.id} labels overlap`).toBe(false);
+      }
+    }
+  });
 });

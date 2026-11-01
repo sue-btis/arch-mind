@@ -10,36 +10,61 @@
   --color-board: var(--board);
   --color-accent: var(--accent);
   --color-on-accent: var(--on-accent);
+  --color-correction: var(--correction);
+}
+
+/* The only grays in the product; dark mode remaps roles onto the same ramp. */
+:root {
+  --gray-0: #ffffff;
+  --gray-1: #f5f5f7;
+  --gray-2: #e8e8ed;
+  --gray-3: #d2d2d7;
+  --gray-4: #aeaeb2;
+  --gray-5: #86868b;
+  --gray-6: #6e6e73;
+  --gray-7: #48484a;
+  --gray-8: #2c2c2e;
+  --gray-9: #1c1c1e;
+  --gray-10: #000000;
 }
 
 :root {
   color-scheme: light dark;
-  --canvas: #f5f5f7;
-  --panel: #ffffff;
-  --line: #d2d2d7;
-  --ink: #1d1d1f;
-  --ink-muted: #5c5c61;
-  --board: #ffffff;
-  --accent: #0066cc;
-  --on-accent: #ffffff;
-  --wire: #424245;
+  --canvas: var(--gray-1);
+  --panel: var(--gray-0);
+  --line: var(--gray-3);
+  --ink: var(--gray-9);
+  --ink-muted: var(--gray-6);
+  --board: var(--gray-0);
+  --accent: var(--gray-9);
+  --on-accent: var(--gray-0);
+  --correction: #c4262e;
+  --wire: var(--gray-7);
+  --wire-requires: #b4237a;
+  --wire-complements: #15803d;
+  --wire-contains: #8a6d00;
   --layer-client: #1d5fd1;
   --layer-network: #0b7a6a;
   --layer-server: #a8500a;
   --layer-data: #7a3fbf;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --canvas: #000000;
-    --panel: #1c1c1e;
-    --line: #3a3a3c;
-    --ink: #f5f5f7;
-    --ink-muted: #a1a1a6;
-    --board: #1c1c1e;
-    --accent: #4da3ff;
-    --on-accent: #000000;
-    --wire: #c7c7cc;
+    --canvas: var(--gray-10);
+    --panel: var(--gray-9);
+    --line: var(--gray-7);
+    --ink: var(--gray-1);
+    --ink-muted: var(--gray-4);
+    --board: var(--gray-9);
+    --accent: var(--gray-1);
+    --on-accent: var(--gray-10);
+    --correction: #ff6961;
+    --wire: var(--gray-4);
+    --wire-requires: #f472b6;
+    --wire-complements: #4ade80;
+    --wire-contains: #facc15;
     --layer-client: #7fb0ff;
     --layer-network: #4fd1bd;
     --layer-server: #f0a45c;
@@ -52,8 +77,18 @@
   outline-offset: 2px;
 }
 
+::selection {
+  background: color-mix(in srgb, var(--ink) 18%, transparent);
+  color: var(--ink);
+}
+
 input[type="checkbox"] {
   accent-color: var(--accent);
+}
+
+html {
+  scrollbar-color: var(--gray-4) transparent;
+  caret-color: var(--ink);
 }
 
 body {
@@ -61,7 +96,7 @@ body {
   background: var(--canvas);
   color: var(--ink);
   font-family: var(--font-sans);
-  font-feature-settings: "tnum";
+  -webkit-font-smoothing: antialiased;
 }
 
 .react-flow {
@@ -83,6 +118,73 @@ body {
 
 .wire:hover .react-flow__edge-path,
 .wire:focus-visible .react-flow__edge-path {
-  stroke: var(--accent);
   stroke-width: 2.5;
+}
+
+/* Re-place: connectors glide to their new zone while the wires, whose routes elk recomputed, wait and then return. */
+.react-flow__node-connector {
+  transition: transform 320ms var(--ease-out);
+  animation: connector-in 220ms var(--ease-out) backwards;
+}
+
+.react-flow__edges {
+  transition: opacity 180ms var(--ease-out);
+}
+
+[data-settling] .react-flow__edges {
+  opacity: 0;
+  transition: opacity 80ms linear;
+}
+
+@keyframes connector-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.sheet-in {
+  animation: sheet-in 260ms var(--ease-out) backwards;
+}
+
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+}
+
+.popover-in {
+  animation: fade-in 120ms var(--ease-out) backwards;
+}
+
+.reveal-in {
+  animation: reveal-in 240ms var(--ease-out) backwards;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes reveal-in {
+  from {
+    opacity: 0;
+    clip-path: inset(0 0 100% 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .react-flow__node-connector {
+    transition: none;
+  }
+
+  [data-settling] .react-flow__edges {
+    opacity: 1;
+  }
+
+  .sheet-in,
+  .reveal-in {
+    animation-name: fade-in;
+  }
 }

@@ -15,9 +15,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { FitMessage } from "./FitMessage.tsx";
 import { layoutConcepts, type Layout, type LayoutEdge } from "./layout.ts";
 import { RelationPopover, useRelationPopover, type RelationInfo, type RelationTargetProps } from "./Popover.tsx";
+import { wireCode, wireStyle } from "./wire-code.ts";
+
+const SETTLE_MS = 320;
 
 type ConnectorData = { id: string; designator: string; title: string; layer: Layer; onOpen: OpenConcept };
-type BandData = { layer: Layer; width: number; height: number };
+type BandData = { layer: Layer; width: number; height: number; empty: boolean };
 type WireData = {
   edge: LayoutEdge;
   dx: number;
@@ -37,10 +40,10 @@ function Connector({ data }: NodeProps<Node<ConnectorData>>) {
       aria-label={`${data.designator} ${data.title}`}
       onClick={(e) => data.onOpen(data.id, e.currentTarget)}
     >
-      <span className="text-[11px] font-semibold" style={{ color: `var(--layer-${data.layer})` }}>
+      <span className="text-[11px] font-semibold tabular-nums" style={{ color: `var(--layer-${data.layer})` }}>
         {data.designator}
       </span>
-      <span className="truncate" title={data.title}>
+      <span className="line-clamp-2 break-words leading-tight" title={data.title}>
         {data.title}
       </span>
       <Handle type="source" position={Position.Bottom} className="opacity-0!" />
@@ -59,11 +62,11 @@ function Band({ data }: NodeProps<Node<BandData>>) {
         background: `color-mix(in srgb, var(--layer-${data.layer}) 7%, transparent)`,
       }}
     >
-      <span
-        className="absolute left-4 top-2 text-[11px] font-semibold uppercase tracking-widest"
-        style={{ color: `var(--layer-${data.layer})` }}
-      >
-        {data.layer}
+      <span className={`absolute left-4 flex items-baseline gap-3 ${data.empty ? "top-1/2 -translate-y-1/2" : "top-2"}`}>
+        <span data-band-name className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: `var(--layer-${data.layer})` }}>
+          {data.layer}
+        </span>
+        {data.empty && <span className="text-[11px] text-ink-muted">no concepts shown</span>}
       </span>
     </div>
   );
@@ -120,7 +123,7 @@ function toFlow(
     id: `band-${b.layer}`,
     type: "band",
     position: { x: 0, y: b.y },
-    data: { layer: b.layer, width: boardWidth, height: b.height },
+    data: { layer: b.layer, width: boardWidth, height: b.height, empty: b.empty },
     width: boardWidth,
     height: b.height,
     zIndex: -1,
@@ -136,21 +139,36 @@ function toFlow(
     width: n.width,
     height: n.height,
   }));
-  const edges: Edge<WireData>[] = layout.edges.map((e) => ({
-    id: e.id,
-    source: e.source,
-    target: e.target,
-    type: "wire",
-    data: { edge: e, dx, from: titles.get(e.source) ?? e.source, to: titles.get(e.target) ?? e.target, targetProps },
-    markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color: "var(--wire)" },
-    style: { stroke: "var(--wire)", strokeWidth: 1 },
-  }));
+  const edges: Edge<WireData>[] = layout.edges.map((e) => {
+    const style = wireStyle(wireCode(e.label));
+    return {
+      id: e.id,
+      source: e.source,
+      target: e.target,
+      type: "wire",
+      data: { edge: e, dx, from: titles.get(e.source) ?? e.source, to: titles.get(e.target) ?? e.target, targetProps },
+      markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color: style.stroke },
+      style: { ...style, strokeWidth: 1 },
+    };
+  });
   return { nodes: [...bands, ...connectors], edges };
 }
 
-export function LayerView({ concepts, boardWidth, onOpen }: { concepts: Concept[]; boardWidth: number; onOpen: OpenConcept }) {
+export function LayerView({
+  concepts,
+  boardWidth,
+  onOpen,
+  onMeasure,
+}: {
+  concepts: Concept[];
+  boardWidth: number;
+  onOpen: OpenConcept;
+  onMeasure: (needed: number) => void;
+}) {
   const [layout, setLayout] = useState<Layout | null>(null);
+  const [settling, setSettling] = useState(false);
   const container = useRef<HTMLDivElement>(null);
+  const laidOut = useRef(false);
   const { open, targetProps } = useRelationPopover(container);
 
   useEffect(() => {
@@ -161,6 +179,21 @@ export function LayerView({ concepts, boardWidth, onOpen }: { concepts: Concept[
     };
   }, [concepts]);
 
+  useEffect(() => {
+    if (!layout) return;
+    if (!laidOut.current) {
+      laidOut.current = true;
+      return;
+    }
+    setSettling(true);
+    const timer = setTimeout(() => setSettling(false), SETTLE_MS);
+    return () => clearTimeout(timer);
+  }, [layout]);
+
+  useEffect(() => {
+    if (layout) onMeasure(layout.width);
+  }, [layout, onMeasure]);
+
   const fits = layout !== null && layout.width <= boardWidth;
   const graph = useMemo(
     () => (layout && fits ? toFlow(layout, boardWidth, onOpen, targetProps) : null),
@@ -169,10 +202,11 @@ export function LayerView({ concepts, boardWidth, onOpen }: { concepts: Concept[
 
   if (layout && boardWidth > 0 && !fits) return <FitMessage count={concepts.length} needed={layout.width} available={boardWidth} />;
   return (
-    <div ref={container} className="relative">
+    <div ref={container} className="relative" data-settling={settling || undefined}>
       {graph && layout && (
         <div style={{ height: layout.height }}>
           <ReactFlow
+            proOptions={{ hideAttribution: true }}
             nodes={graph.nodes}
             edges={graph.edges}
             nodeTypes={nodeTypes}

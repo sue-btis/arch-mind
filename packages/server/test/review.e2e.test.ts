@@ -57,7 +57,7 @@ const horizontalOverflow = (page: Page) => page.evaluate(() => document.document
 async function shot(page: Page, name: string, scheme: string) {
   if (!shotDir) return;
   await mkdir(shotDir, { recursive: true });
-  await page.screenshot({ path: join(shotDir, `${name}-1366x768-${scheme}.png`) });
+  await page.screenshot({ path: join(shotDir, `${name}-1366x768-${scheme}.png`), animations: "disabled" });
 }
 
 describe.each(["light", "dark"] as const)("daily review at 1366 x 768, %s mode (TST-020, AC-5, AC-6)", (scheme) => {

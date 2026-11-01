@@ -1,5 +1,6 @@
 import type { FileProblem } from "@arch-mind/rules/model";
 import { NO_FILTERS, hasFilters, type Filters } from "./filter.ts";
+import { WIRE_LEGEND, wireAbbrev, wireStyle } from "./wire-code.ts";
 
 export interface FacetCatalog {
   layers: Filters["layers"];
@@ -45,6 +46,31 @@ export function Sidebar({
           Clear filters
         </button>
       )}
+      <section aria-labelledby="wires-title">
+        <h2 id="wires-title" className="mb-1.5 text-[11px] font-semibold uppercase tracking-widest text-ink-muted">
+          Wires
+        </h2>
+        <ul className="flex flex-col gap-1 text-[13px]">
+          {WIRE_LEGEND.map(({ code, type }) => {
+            const { stroke, strokeDasharray } = wireStyle(code);
+            return (
+              <li key={code} className="flex items-center gap-2 py-0.5">
+                <svg width="20" height="8" aria-hidden="true" className="shrink-0">
+                  <line x1="0" y1="4" x2="20" y2="4" stroke={stroke} strokeWidth="2" strokeDasharray={strokeDasharray} />
+                </svg>
+                <span className="w-6 text-[11px] font-semibold text-ink-muted">{wireAbbrev(code)}</span>
+                {type}
+              </li>
+            );
+          })}
+          <li className="flex items-center gap-2 py-0.5 text-ink-muted">
+            <svg width="20" height="8" aria-hidden="true" className="shrink-0">
+              <line x1="0" y1="4" x2="20" y2="4" stroke="var(--wire)" strokeWidth="2" />
+            </svg>
+            any other type
+          </li>
+        </ul>
+      </section>
       {problems.length > 0 && (
         <section aria-labelledby="problems-title" data-testid="problems">
           <h2 id="problems-title" className="mb-1.5 text-[11px] font-semibold uppercase tracking-widest text-ink-muted">
