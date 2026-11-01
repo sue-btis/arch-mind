@@ -1,4 +1,5 @@
 %% Capture (J-001): proposals are confirmed in the Claude Code conversation; the capture server validates before writing.
+%% Pictogram and illustration are optional: the author may decline either, and the concept is saved without it (FR-034, FR-035, PD-026).
 sequenceDiagram
   actor Author
   participant CC as Claude Code
@@ -8,17 +9,30 @@ sequenceDiagram
   Author->>CC: Capture "Secure cookie attribute"
   CC->>Cap: list_concepts
   Cap->>Store: read frontmatter of all concepts
-  Cap-->>CC: ids, titles, layers
+  Cap-->>CC: ids, titles, layers, pictograms, pictogram catalog
   CC-->>Author: proposed relations with sources, SEE-I draft, layer and facets
   Author->>CC: keep relations, write one explanation each, accept or rewrite each SEE-I part
+  CC-->>Author: proposed pictogram from the catalog
+  Author->>CC: accept, ask for another, or decline
+  opt illustration part is drawable (FR-035)
+    CC->>Cap: preview_illustration(id, illustration)
+    alt SVG passes the allowlist
+      Cap-->>CC: preview page path (temp page outside the store, opened in the default browser as an image)
+      CC-->>Author: proposed visual illustration shown in the browser
+      Author->>CC: accept, ask for another, or decline
+    else SVG fails the allowlist
+      Cap-->>CC: rejected: invalid_illustration with the reasons
+      CC-->>Author: draws another illustration
+    end
+  end
   CC-->>Author: proposed recall questions
   Author->>CC: confirm questions, name the episode
-  CC->>Cap: save_concept(concept)
+  CC->>Cap: save_concept(concept, accepted pictogram and illustration if any)
   alt every rule holds (BR-001 to BR-005)
-    Cap->>Store: write temp file, rename into place
+    Cap->>Store: write illustration SVG first when present, then the concept file (temp file, rename into place)
     Cap-->>CC: saved
     CC-->>Author: saved, first review due tomorrow
-  else a rule fails
+  else a rule fails (including unknown pictogram or invalid illustration)
     Cap-->>CC: rejected: the exact field or relation (UX-003)
     CC-->>Author: what to fix
   end
