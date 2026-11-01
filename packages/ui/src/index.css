@@ -91,6 +91,12 @@ html {
   caret-color: var(--ink);
 }
 
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
   margin: 0;
   background: var(--canvas);
@@ -203,7 +209,7 @@ body {
 .wire:focus-visible .line { stroke-width: 2.5; }
 .wire:focus-visible .hit { stroke: var(--accent); stroke-opacity: 0.18; }
 
-.chips rect { fill: var(--board); pointer-events: none; }
+.chips rect { fill: var(--canvas); pointer-events: none; }
 .chips text { fill: var(--ink); font-size: 13px; pointer-events: none; }
 
 .obj {
@@ -217,11 +223,17 @@ body {
   font-size: 13px;
   fill: var(--ink);
   paint-order: stroke;
-  stroke: var(--board);
+  stroke: var(--canvas);
   stroke-width: 4px;
   stroke-linejoin: round;
 }
 .nlab .des { fill: var(--k); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.canvas-dots {
+  background-color: var(--canvas);
+  background-image: radial-gradient(color-mix(in srgb, var(--ink) 12%, transparent) 1px, transparent 1.2px);
+  background-size: 22px 22px;
+}
 
 .zoom-btn {
   min-width: 28px;

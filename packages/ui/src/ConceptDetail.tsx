@@ -7,6 +7,7 @@ interface Detail {
 }
 
 export const SEE_I_LABELS = { statement: "State", elaboration: "Elaborate", example: "Exemplify", illustration: "Illustrate" } as const;
+export const SHEET_WIDTH = 420;
 export const SECTION_TITLE = "mb-1.5 text-[11px] font-semibold uppercase tracking-widest text-ink-muted";
 
 export function ConceptDetail({ id, titles, onClose }: { id: string; titles: Map<string, string>; onClose: () => void }) {
@@ -44,7 +45,8 @@ export function ConceptDetail({ id, titles, onClose }: { id: string; titles: Map
       aria-labelledby="concept-detail-title"
       tabIndex={-1}
       data-testid="concept-detail"
-      className="sheet-in fixed bottom-4 right-4 top-4 z-30 w-[420px] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-2xl border border-line bg-panel p-4 text-[13px] shadow-lg"
+      style={{ width: SHEET_WIDTH }}
+      className="sheet-in fixed bottom-4 right-4 top-4 z-30 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-2xl border border-line bg-panel p-4 text-[13px] shadow-lg"
     >
       <div className="flex items-start justify-between gap-3">
         <h2 id="concept-detail-title" className="text-[17px] font-semibold tracking-tight">
