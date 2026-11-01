@@ -2,7 +2,18 @@ import ELK from "elkjs/lib/elk.bundled.js";
 import type { ElkExtendedEdge } from "elkjs/lib/elk-api";
 import { LAYERS, type Concept, type Layer } from "@arch-mind/rules/model";
 
-export const NODE_WIDTH = 200;
+export function designators(concepts: Concept[]): Map<string, string> {
+  const counters = new Map<Layer, number>();
+  return new Map(
+    concepts.map((c) => {
+      const index = (counters.get(c.layer) ?? 0) + 1;
+      counters.set(c.layer, index);
+      return [c.id, `${c.layer[0]!.toUpperCase()}${index}`];
+    }),
+  );
+}
+
+export const NODE_WIDTH = 176;
 export const NODE_HEIGHT = 48;
 const MARGIN = 16;
 const BAND_PAD_TOP = 30;
@@ -37,6 +48,8 @@ export interface LayoutEdge {
   source: string;
   target: string;
   label: string;
+  citation: string;
+  explanation: string;
   points: Point[];
   labelAt: Point;
 }
@@ -54,7 +67,9 @@ const elk = new ELK();
 export async function layoutConcepts(concepts: Concept[]): Promise<Layout> {
   const ids = new Set(concepts.map((c) => c.id));
   const relations = concepts.flatMap((c) =>
-    c.relations.filter((r) => ids.has(r.to) && r.to !== c.id).map((r) => ({ from: c.id, to: r.to, label: r.type })),
+    c.relations
+      .filter((r) => ids.has(r.to) && r.to !== c.id)
+      .map((r) => ({ from: c.id, to: r.to, label: r.type, citation: r.source, explanation: r.explanation })),
   );
 
   const solved = await elk.layout({
@@ -63,7 +78,7 @@ export async function layoutConcepts(concepts: Concept[]): Promise<Layout> {
       "elk.algorithm": "layered",
       "elk.direction": "DOWN",
       "elk.partitioning.activate": "true",
-      "elk.spacing.nodeNode": "28",
+      "elk.spacing.nodeNode": "24",
       "elk.layered.spacing.nodeNodeBetweenLayers": "64",
       "elk.edgeRouting": "ORTHOGONAL",
     },
@@ -76,14 +91,12 @@ export async function layoutConcepts(concepts: Concept[]): Promise<Layout> {
     edges: relations.map((r, i) => ({ id: `e${i}`, sources: [r.from], targets: [r.to] })),
   });
 
-  const counters = new Map<Layer, number>();
+  const names = designators(concepts);
   const raw = concepts.map((c): LayoutNode => {
     const child = solved.children?.find((n) => n.id === c.id);
-    const index = (counters.get(c.layer) ?? 0) + 1;
-    counters.set(c.layer, index);
     return {
       id: c.id,
-      designator: `${c.layer[0]!.toUpperCase()}${index}`,
+      designator: names.get(c.id)!,
       title: c.title,
       layer: c.layer,
       x: (child?.x ?? 0) + MARGIN,
@@ -133,7 +146,16 @@ export async function layoutConcepts(concepts: Concept[]): Promise<Layout> {
           y: p.y + shiftAt(p.y) - origin,
         }))
       : [];
-    return { id: `e${i}`, source: r.from, target: r.to, label: r.label, points, labelAt: labelPoint(points, r.label, nodes) };
+    return {
+      id: `e${i}`,
+      source: r.from,
+      target: r.to,
+      label: r.label,
+      citation: r.citation,
+      explanation: r.explanation,
+      points,
+      labelAt: labelPoint(points, r.label, nodes),
+    };
   });
 
   const last = bands[bands.length - 1]!;

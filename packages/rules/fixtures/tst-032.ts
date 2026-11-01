@@ -302,3 +302,23 @@ export const tst032Concepts: Concept[] = [
 ];
 
 export const tst032RelationCount = tst032Concepts.reduce((n, c) => n + c.relations.length, 0);
+
+// A hub related to 13 server concepts: elk ranks the spokes together in one row, so the layout is far wider than 1366 px.
+export const overWideConcepts: Concept[] = [
+  concept(
+    "wide-hub",
+    "Wide hub",
+    "client",
+    ["Statement.", "Elaboration.", "Example.", "Illustration."],
+    "What is this?",
+    Array.from({ length: 13 }, (_, i) => ({
+      type: "uses",
+      to: `wide-${i + 1}`,
+      source: "Fixture",
+      explanation: "The hub uses each spoke.",
+    })),
+  ),
+  ...Array.from({ length: 13 }, (_, i) =>
+    concept(`wide-${i + 1}`, `Wide spoke ${i + 1}`, "server", ["Statement.", "Elaboration.", "Example.", "Illustration."], "What is this?"),
+  ),
+];

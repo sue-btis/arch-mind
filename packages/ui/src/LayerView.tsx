@@ -8,24 +8,34 @@ import {
   type EdgeProps,
   type Node,
   type NodeProps,
-  type ReactFlowInstance,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import type { Concept, Layer } from "@arch-mind/rules/model";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { FitMessage } from "./FitMessage.tsx";
 import { layoutConcepts, type Layout, type LayoutEdge } from "./layout.ts";
+import { RelationPopover, useRelationPopover, type RelationInfo, type RelationTargetProps } from "./Popover.tsx";
 
-type ConnectorData = { designator: string; title: string; layer: Layer };
+type ConnectorData = { id: string; designator: string; title: string; layer: Layer; onOpen: OpenConcept };
 type BandData = { layer: Layer; width: number; height: number };
-type WireData = { edge: LayoutEdge; dx: number };
+type WireData = {
+  edge: LayoutEdge;
+  dx: number;
+  from: string;
+  to: string;
+  targetProps: (key: string, relations: RelationInfo[]) => RelationTargetProps;
+};
+
+export type OpenConcept = (id: string, opener: HTMLElement) => void;
 
 function Connector({ data }: NodeProps<Node<ConnectorData>>) {
   return (
-    <div
-      className="flex h-full items-center gap-2 border bg-board px-2.5 text-[13px]"
-      style={{ borderColor: `var(--layer-${data.layer})` }}
-      role="group"
+    <button
+      type="button"
+      className="flex h-full w-full items-center gap-2 border bg-board px-2.5 text-left text-[13px]"
+      style={{ borderColor: `var(--layer-${data.layer})`, pointerEvents: "all" }}
       aria-label={`${data.designator} ${data.title}`}
+      onClick={(e) => data.onOpen(data.id, e.currentTarget)}
     >
       <span className="text-[11px] font-semibold" style={{ color: `var(--layer-${data.layer})` }}>
         {data.designator}
@@ -35,7 +45,7 @@ function Connector({ data }: NodeProps<Node<ConnectorData>>) {
       </span>
       <Handle type="source" position={Position.Bottom} className="opacity-0!" />
       <Handle type="target" position={Position.Top} className="opacity-0!" />
-    </div>
+    </button>
   );
 }
 
@@ -61,27 +71,51 @@ function Band({ data }: NodeProps<Node<BandData>>) {
 
 // elk routed the wire; React Flow only draws it, so the handles' own geometry is ignored.
 function Wire({ id, data, markerEnd, style }: EdgeProps<Edge<WireData>>) {
-  const { edge, dx } = data!;
+  const { edge, dx, from, to, targetProps } = data!;
   const path = edge.points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x + dx},${p.y}`).join(" ");
+  const props = targetProps(id, [{ type: edge.label, from, to, source: edge.citation, explanation: edge.explanation }]);
   return (
-    <BaseEdge
-      id={id}
-      path={path}
-      markerEnd={markerEnd}
-      style={style}
-      label={edge.label}
-      labelX={edge.labelAt.x + dx}
-      labelY={edge.labelAt.y}
-      labelBgPadding={[4, 2]}
-    />
+    <g
+      className="wire"
+      data-relation-target
+      tabIndex={0}
+      role="button"
+      aria-label={`${edge.label}: ${from} to ${to}`}
+      style={{ pointerEvents: "none" }}
+      {...props}
+      onKeyDown={(e) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        props.onClick(e);
+      }}
+    >
+      <BaseEdge
+        id={id}
+        path={path}
+        markerEnd={markerEnd}
+        style={style}
+        label={edge.label}
+        labelX={edge.labelAt.x + dx}
+        labelY={edge.labelAt.y}
+        labelBgPadding={[4, 2]}
+        interactionWidth={0}
+      />
+      <path d={path} fill="none" stroke="transparent" strokeWidth={14} style={{ pointerEvents: "stroke" }} />
+    </g>
   );
 }
 
 const nodeTypes = { connector: Connector, band: Band };
 const edgeTypes = { wire: Wire };
 
-function toFlow(layout: Layout, boardWidth: number): { nodes: Node[]; edges: Edge[] } {
+function toFlow(
+  layout: Layout,
+  boardWidth: number,
+  onOpen: OpenConcept,
+  targetProps: WireData["targetProps"],
+): { nodes: Node[]; edges: Edge[] } {
   const dx = Math.max(0, (boardWidth - layout.width) / 2);
+  const titles = new Map(layout.nodes.map((n) => [n.id, `${n.designator} ${n.title}`]));
   const bands: Node<BandData>[] = layout.bands.map((b) => ({
     id: `band-${b.layer}`,
     type: "band",
@@ -98,7 +132,7 @@ function toFlow(layout: Layout, boardWidth: number): { nodes: Node[]; edges: Edg
     id: n.id,
     type: "connector",
     position: { x: n.x + dx, y: n.y },
-    data: { designator: n.designator, title: n.title, layer: n.layer },
+    data: { id: n.id, designator: n.designator, title: n.title, layer: n.layer, onOpen },
     width: n.width,
     height: n.height,
   }));
@@ -107,18 +141,17 @@ function toFlow(layout: Layout, boardWidth: number): { nodes: Node[]; edges: Edg
     source: e.source,
     target: e.target,
     type: "wire",
-    data: { edge: e, dx },
+    data: { edge: e, dx, from: titles.get(e.source) ?? e.source, to: titles.get(e.target) ?? e.target, targetProps },
     markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color: "var(--wire)" },
     style: { stroke: "var(--wire)", strokeWidth: 1 },
   }));
   return { nodes: [...bands, ...connectors], edges };
 }
 
-export function LayerView({ concepts }: { concepts: Concept[] }) {
+export function LayerView({ concepts, boardWidth, onOpen }: { concepts: Concept[]; boardWidth: number; onOpen: OpenConcept }) {
   const [layout, setLayout] = useState<Layout | null>(null);
-  const [width, setWidth] = useState(0);
-  const wrapper = useRef<HTMLDivElement>(null);
-  const flow = useRef<ReactFlowInstance | null>(null);
+  const container = useRef<HTMLDivElement>(null);
+  const { open, targetProps } = useRelationPopover(container);
 
   useEffect(() => {
     let current = true;
@@ -128,36 +161,23 @@ export function LayerView({ concepts }: { concepts: Concept[] }) {
     };
   }, [concepts]);
 
-  useEffect(() => {
-    const el = wrapper.current;
-    if (!el) return;
-    const observer = new ResizeObserver(([entry]) => setWidth(entry?.contentRect.width ?? 0));
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
+  const fits = layout !== null && layout.width <= boardWidth;
+  const graph = useMemo(
+    () => (layout && fits ? toFlow(layout, boardWidth, onOpen, targetProps) : null),
+    [layout, fits, boardWidth, onOpen, targetProps],
+  );
 
-  const zoom = layout && width > 0 ? Math.min(1, width / layout.width) : 1;
-  useEffect(() => {
-    void flow.current?.setViewport({ x: 0, y: 0, zoom });
-  }, [zoom, layout]);
-
-  const boardWidth = Math.max(layout?.width ?? 0, width / zoom);
-  const graph = useMemo(() => (layout ? toFlow(layout, boardWidth) : null), [layout, boardWidth]);
-
+  if (layout && boardWidth > 0 && !fits) return <FitMessage count={concepts.length} needed={layout.width} available={boardWidth} />;
   return (
-    <div ref={wrapper} className="border border-line bg-board" data-testid="board" data-zoom={zoom}>
+    <div ref={container} className="relative">
       {graph && layout && (
-        <div style={{ height: Math.ceil(layout.height * zoom) }}>
+        <div style={{ height: layout.height }}>
           <ReactFlow
             nodes={graph.nodes}
             edges={graph.edges}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
-            onInit={(instance) => {
-              flow.current = instance;
-              void instance.setViewport({ x: 0, y: 0, zoom });
-            }}
-            defaultViewport={{ x: 0, y: 0, zoom }}
+            defaultViewport={{ x: 0, y: 0, zoom: 1 }}
             panOnDrag={false}
             zoomOnScroll={false}
             zoomOnPinch={false}
@@ -172,6 +192,7 @@ export function LayerView({ concepts }: { concepts: Concept[] }) {
           />
         </div>
       )}
+      <RelationPopover open={open} container={container} />
     </div>
   );
 }

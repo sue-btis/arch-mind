@@ -18,3 +18,10 @@ export {
   type SaveOptions,
   type SaveOutcome,
 } from "./store.ts";
+export {
+  addDays,
+  loadConceptDetail,
+  loadReviewLines,
+  replayQuestionStates,
+  type ConceptDetailOutcome,
+} from "./reviews.ts";

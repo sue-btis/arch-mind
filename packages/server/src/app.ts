@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { extname, join, normalize, sep } from "node:path";
-import { LAYERS, loadConcepts, loadFacets } from "@arch-mind/rules";
+import { LAYERS, loadConceptDetail, loadConcepts, loadFacets } from "@arch-mind/rules";
 import { checkRequest } from "./guard.ts";
 
 export interface RunningServer {
@@ -53,6 +53,13 @@ export async function startServer(options: { storePath: string; uiDir: string; p
         if (path === "/api/concepts") return sendJson(res, 200, await loadConcepts(storePath));
         const { domains, concerns } = await loadFacets(storePath);
         return sendJson(res, 200, { layers: LAYERS, domains, concerns });
+      }
+      const detailId = /^\/api\/concepts\/([^/]+)$/.exec(path)?.[1];
+      if (detailId !== undefined) {
+        if (!readOnly) return sendJson(res, 405, { error: "Method not allowed" });
+        const detail = await loadConceptDetail(storePath, detailId);
+        if (!detail.ok) return sendJson(res, 404, { error: detail.errors[0]!.message });
+        return sendJson(res, 200, { concept: detail.concept, questions: detail.questions });
       }
       if (path.startsWith("/api/")) return sendJson(res, 404, { error: "Not found" });
       if (!readOnly) return sendJson(res, 405, { error: "Method not allowed" });
