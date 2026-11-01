@@ -1,7 +1,7 @@
 import ELK from "elkjs/lib/elk.bundled.js";
 import type { ElkExtendedEdge, ElkNode } from "elkjs/lib/elk-api";
 import { LAYERS, isPictogramId, type Concept, type Layer } from "@arch-mind/rules/model";
-import { OBJECT_HEIGHT, SQUASH, chipLines, chipSize } from "./metrics.ts";
+import { OBJECT_HEIGHT, SHEAR, SQUASH, chipLines, chipSize } from "./metrics.ts";
 
 export function designators(concepts: Concept[]): Map<string, string> {
   const counters = new Map<Layer, number>();
@@ -19,7 +19,7 @@ export function designators(concepts: Concept[]): Map<string, string> {
 // Its width also has to hold the sheared label below the ground point.
 export const CELL_WIDTH = 190;
 export const CELL_HEIGHT = OBJECT_HEIGHT / SQUASH;
-export const BAND_PAD = 28;
+export const BAND_PAD = 16;
 const MARGIN = 16;
 
 export interface Point {
@@ -101,11 +101,11 @@ export async function layoutConcepts(concepts: Concept[]): Promise<PlateLayout> 
       "elk.edgeRouting": "ORTHOGONAL",
       "elk.separateConnectedComponents": "false",
       "elk.spacing.nodeNode": "24",
-      "elk.layered.spacing.nodeNodeBetweenLayers": "24",
+      "elk.layered.spacing.nodeNodeBetweenLayers": "64",
       "elk.spacing.edgeNode": "14",
-      "elk.spacing.edgeEdge": "14",
+      "elk.spacing.edgeEdge": "40",
       "elk.layered.spacing.edgeNodeBetweenLayers": "28",
-      "elk.layered.spacing.edgeEdgeBetweenLayers": "14",
+      "elk.layered.spacing.edgeEdgeBetweenLayers": "28",
       "elk.spacing.edgeLabel": "6",
       "elk.edgeLabels.inline": "true",
       "elk.layered.nodePlacement.strategy": "SIMPLE",
@@ -118,7 +118,7 @@ export async function layoutConcepts(concepts: Concept[]): Promise<PlateLayout> 
         id: `e${i}`,
         sources: [r.from],
         targets: [r.to],
-        labels: [{ id: `l${i}`, text: r.label, width: size.width, height: size.height / SQUASH, layoutOptions: { "elk.edgeLabels.inline": "true" } }],
+        labels: [{ id: `l${i}`, text: r.label, width: size.width + (SHEAR * size.height) / SQUASH, height: size.height / SQUASH, layoutOptions: { "elk.edgeLabels.inline": "true" } }],
       };
     }),
   });
@@ -136,16 +136,9 @@ export async function layoutConcepts(concepts: Concept[]): Promise<PlateLayout> 
     const own = [...nodes, ...marks].filter((n) => n.layer === layer);
     return { layer, top: Math.min(...own.map((n) => n.y)), bottom: Math.max(...own.map((n) => n.y + n.height)) };
   });
-  // A band reaches half way into the gap to its neighbour, at most BAND_PAD, so bands never overlap.
-  const bands = extents.map((e, i): PlateBand => {
-    const before = extents[i - 1];
-    const after = extents[i + 1];
-    return {
-      layer: e.layer,
-      top: e.top - Math.min(BAND_PAD, before ? Math.max(0, (e.top - before.bottom) / 2) : BAND_PAD),
-      bottom: e.bottom + Math.min(BAND_PAD, after ? Math.max(0, (after.top - e.bottom) / 2) : BAND_PAD),
-    };
-  });
+  // A band is its cells plus a little plate margin; the rest of the room elk left between two partitions is the gap
+  // the plates are spaced by, so wires between layers cross it instead of running along a plate edge.
+  const bands = extents.map((e): PlateBand => ({ layer: e.layer, top: e.top - BAND_PAD, bottom: e.bottom + BAND_PAD }));
 
   const edges = relations.map((r, i): PlateEdge => {
     const solvedEdge = (solved.edges as ElkExtendedEdge[]).find((e) => e.id === `e${i}`)!;

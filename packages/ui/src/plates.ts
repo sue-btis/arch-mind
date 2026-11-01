@@ -17,7 +17,6 @@ import {
 
 export { FIT_FLOOR, GROUND, LABEL_OFFSET, LABEL_PX, LINE_HEIGHT, PICTOGRAM_PX, SHEAR, SQUASH, labelLines, wrapText } from "./metrics.ts";
 
-const PLATE_GAP = 24;
 const SCENE_MARGIN = 12;
 const MIN_SEGMENT = 9;
 
@@ -130,89 +129,78 @@ export function sharesLane(s1: { a: Point; b: Point }, s2: { a: Point; b: Point 
   return Math.min(length, hi) - Math.max(0, lo) > 1;
 }
 
-interface Region {
-  y0: number;
-  y1: number;
-  at: (p: Point) => Point;
+const LANE = 12;
+const LANE_PAD = 20;
+const MIN_GAP = 64;
+const EPS = 0.5;
+// Elk-plane units added to each band: with layout's own padding alone a wire's first drop off the plate edge is a stub under 8 px.
+const EDGE_PAD = 4;
+
+type Place = { band: number } | { gap: number };
+
+function locate(bands: PlateBand[], y: number): Place {
+  for (const [i, b] of bands.entries()) {
+    if (y >= b.top - EPS && y <= b.bottom + EPS) return { band: i };
+    const next = bands[i + 1];
+    if (next && y > b.bottom + EPS && y < next.top - EPS) return { gap: i };
+  }
+  return { band: y < bands[0]!.top ? 0 : bands.length - 1 };
 }
 
-// The elk plane is cut into one band per plate and the gaps between them. A band maps onto its plate; a gap maps
-// onto the screen gap between two plates, so a wire that crosses it stays one continuous line.
-function regionsFor(bands: PlateBand[]): { regions: Region[]; bandRegions: Region[] } {
-  const regions: Region[] = [];
-  const bandRegions: Region[] = [];
-  let offset = 0;
-  bands.forEach((band, i) => {
-    const depth = band.bottom - band.top;
-    const start = offset;
-    const region: Region = {
-      y0: band.top,
-      y1: band.bottom,
-      at: (p) => {
-        const v = p.y - band.top;
-        return { x: p.x - SHEAR * v, y: start + SQUASH * v };
-      },
-    };
-    regions.push(region);
-    bandRegions.push(region);
-    const front = start + SQUASH * depth;
-    const following = bands[i + 1];
-    const gap = following ? Math.max(0, following.top - band.bottom) : 0;
-    const screenGap = PLATE_GAP + SQUASH * gap;
-    if (following && gap > 0) {
-      regions.push({
-        y0: band.bottom,
-        y1: following.top,
-        at: (p) => {
-          const t = (p.y - band.bottom) / gap;
-          return { x: p.x - SHEAR * depth * (1 - t), y: front + t * screenGap };
-        },
-      });
+// A wire's visit to the room between two plates: it leaves one band at `from` and re-enters at `to`.
+interface Dive {
+  gap: number;
+  from: Point;
+  to: Point;
+  fromBand: number;
+  toBand: number;
+  // elk's own height for the wire's horizontal run in the gap; it orders the lanes.
+  key: number;
+  lane: number;
+}
+
+type Piece = { at: Point; band: number } | Dive;
+
+// A vertical run that crosses a band edge gets a point there, so every gap visit starts and ends on a plate edge.
+function densify(bands: PlateBand[], route: Point[]): Point[] {
+  const edges = bands.flatMap((b) => [b.top, b.bottom]);
+  const out = [route[0]!];
+  for (const b of route.slice(1)) {
+    const a = out[out.length - 1]!;
+    if (Math.abs(a.x - b.x) < 0.01) {
+      const crossed = edges.filter((y) => y > Math.min(a.y, b.y) + EPS && y < Math.max(a.y, b.y) - EPS).sort((p, q) => (b.y > a.y ? p - q : q - p));
+      for (const y of crossed) out.push({ x: a.x, y });
     }
-    offset = front + screenGap;
-  });
-  return { regions, bandRegions };
+    out.push(b);
+  }
+  return out;
 }
 
-function regionAt(regions: Region[], y: number): Region {
-  const found = regions.find((r) => y >= r.y0 && y <= r.y1);
-  if (found) return found;
-  return y < regions[0]!.y0 ? regions[0]! : regions[regions.length - 1]!;
-}
-
-// A vertical run that crosses regions gets a point at each region edge, so it bends exactly where the mapping does.
-function projectPolyline(regions: Region[], route: Point[]): Point[] {
-  const out: Point[] = [];
-  const push = (p: Point) => {
+function piecesOf(bands: PlateBand[], route: Point[]): Piece[] {
+  const pts = densify(bands, route);
+  const out: Piece[] = [];
+  const bandOf = (p: Point) => (locate(bands, p.y) as { band: number }).band;
+  for (let i = 0; i < pts.length; ) {
+    const here = locate(bands, pts[i]!.y);
+    if ("gap" in here) {
+      let k = i;
+      while (k < pts.length && "gap" in locate(bands, pts[k]!.y)) k++;
+      const inner = pts.slice(i, k);
+      const run = inner.find((p, j) => j > 0 && Math.abs(p.y - inner[j - 1]!.y) < 0.01);
+      const from = pts[i - 1]!;
+      const to = pts[k]!;
+      out.push({ gap: here.gap, from, to, fromBand: bandOf(from), toBand: bandOf(to), key: (run ?? inner[0]!).y, lane: 0 });
+      i = k;
+      continue;
+    }
+    const previous = pts[i - 1];
     const last = out[out.length - 1];
-    if (!last || Math.abs(last.x - p.x) > 0.01 || Math.abs(last.y - p.y) > 0.01) out.push(p);
-  };
-  route.forEach((p, i) => {
-    const from = route[i - 1];
-    if (!from) return push(regionAt(regions, p.y).at(p));
-    if (from.x !== p.x || from.y === p.y) return push(regionAt(regions, p.y).at(p));
-    const down = p.y > from.y;
-    const lo = Math.min(from.y, p.y);
-    const hi = Math.max(from.y, p.y);
-    const crossed = regions.filter((r) => r.y1 > lo && r.y0 < hi);
-    if (!down) crossed.reverse();
-    for (const r of crossed) {
-      const a = Math.max(r.y0, lo);
-      const b = Math.min(r.y1, hi);
-      push(r.at({ x: p.x, y: down ? a : b }));
-      push(r.at({ x: p.x, y: down ? b : a }));
+    if (previous && last && "at" in last && last.band !== here.band && Math.abs(previous.x - pts[i]!.x) < 0.01) {
+      const gap = Math.min(last.band, here.band);
+      out.push({ gap, from: previous, to: pts[i]!, fromBand: last.band, toBand: here.band, key: (bands[gap]!.bottom + bands[gap + 1]!.top) / 2, lane: 0 });
     }
-    if (crossed.length === 0) push(regionAt(regions, p.y).at(p));
-  });
-  // A jog shorter than a few px is only a rounding of elk's spacing after the squash; it reads as a stray stub.
-  for (let i = 1; i < out.length - 1; ) {
-    const short = Math.hypot(out[i]!.x - out[i - 1]!.x, out[i]!.y - out[i - 1]!.y) < MIN_SEGMENT || Math.hypot(out[i + 1]!.x - out[i]!.x, out[i + 1]!.y - out[i]!.y) < MIN_SEGMENT;
-    if (short) {
-      out.splice(i, 1);
-      i = Math.max(1, i - 1);
-    } else {
-      i++;
-    }
+    out.push({ at: pts[i]!, band: here.band });
+    i++;
   }
   return out;
 }
@@ -230,9 +218,9 @@ function union(boxes: Box[]): Box {
   };
 }
 
-function sceneObject(n: PlateNode, band: Region, caption?: string): SceneObject {
+function sceneObject(n: PlateNode, onPlate: (p: Point) => Point, caption?: string): SceneObject {
   const ground = n.y + GROUND_FRACTION * n.height;
-  const at = band.at({ x: n.x + n.width / 2, y: ground });
+  const at = onPlate({ x: n.x + n.width / 2, y: ground });
   const lines = caption === undefined ? labelLines(n.designator, n.title) : [caption];
   const widest = Math.max(...lines.map((line, i) => textWidth(i === 0 && caption === undefined ? `${n.designator} ${line}` : line)));
   const pictogram: Box = { x0: at.x - PICTOGRAM_PX / 2, y0: at.y - GROUND.y, x1: at.x + PICTOGRAM_PX / 2, y1: at.y - GROUND.y + PICTOGRAM_PX };
@@ -242,7 +230,7 @@ function sceneObject(n: PlateNode, band: Region, caption?: string): SceneObject 
     { x: n.x + n.width, y: n.y },
     { x: n.x + n.width, y: n.y + n.height },
     { x: n.x, y: n.y + n.height },
-  ].map((p) => band.at(p));
+  ].map(onPlate);
   return {
     id: n.id,
     designator: n.designator,
@@ -257,34 +245,83 @@ function sceneObject(n: PlateNode, band: Region, caption?: string): SceneObject 
   };
 }
 
-export function buildScene(layout: PlateLayout): Scene {
-  const { regions, bandRegions } = regionsFor(layout.bands);
-  const regionOf = (layer: Layer) => bandRegions[LAYERS.indexOf(layer)]!;
-  const objects = layout.nodes.map((n) => sceneObject(n, regionOf(n.layer)));
+export function buildScene(layout: PlateLayout, shear = SHEAR): Scene {
+  const bands = layout.bands.map((b) => ({ ...b, top: b.top - EDGE_PAD, bottom: b.bottom + EDGE_PAD }));
+  const routes = layout.edges.map((e) => piecesOf(bands, e.route));
+  const dives: Dive[][] = bands.slice(0, -1).map(() => []);
+  for (const piece of routes.flat()) if ("gap" in piece) dives[piece.gap]!.push(piece);
+  for (const list of dives) list.sort((a, b) => a.key - b.key).forEach((dive, lane) => (dive.lane = lane));
+
+  const starts = [0];
+  const gapHeights = dives.map((list) => Math.max(MIN_GAP, 2 * LANE_PAD + (list.length - 1) * LANE));
+  bands.slice(0, -1).forEach((b, i) => starts.push(starts[i]! + SQUASH * (b.bottom - b.top) + gapHeights[i]!));
+  const onPlate = (band: number) => (p: Point) => ({ x: p.x - shear * (p.y - bands[band]!.top), y: starts[band]! + SQUASH * (p.y - bands[band]!.top) });
+  const laneY = (gap: number, lane: number) => starts[gap]! + SQUASH * (bands[gap]!.bottom - bands[gap]!.top) + LANE_PAD + lane * LANE;
+
+  const objects = layout.nodes.map((n) => sceneObject(n, onPlate(LAYERS.indexOf(n.layer))));
 
   const plates: ScenePlate[] = LAYERS.map((layer, i) => {
-    const band = layout.bands[i]!;
-    const region = bandRegions[i]!;
+    const band = bands[i]!;
+    const at = onPlate(i);
     const corners = [
       { x: 0, y: band.top },
       { x: layout.width, y: band.top },
       { x: layout.width, y: band.bottom },
       { x: 0, y: band.bottom },
-    ].map(region.at);
+    ].map(at);
     return {
       layer,
       corners,
-      mark: sceneObject(layout.marks[i]!, region, `${layer.toUpperCase()} ${layout.shown[layer]} shown`),
+      mark: sceneObject(layout.marks[i]!, at, `${layer.toUpperCase()} ${layout.shown[layer]} shown`),
       shown: layout.shown[layer],
-      emptyAt: region.at({ x: layout.width * 0.75, y: (band.top + band.bottom) / 2 }),
+      emptyAt: at({ x: layout.width * 0.75, y: (band.top + band.bottom) / 2 }),
     };
   });
 
-  const wires: SceneWire[] = layout.edges.map((e) => {
+  const wires: SceneWire[] = layout.edges.map((e, w) => {
+    const path: Point[] = [];
+    const anchors = new Set<Point>();
+    const lanes = new Map<number, Point>();
+    const push = (p: Point, anchor = false) => {
+      const last = path[path.length - 1];
+      if (last && Math.abs(last.x - p.x) < 0.01 && Math.abs(last.y - p.y) < 0.01) {
+        if (anchor) anchors.add(last);
+        return;
+      }
+      path.push(p);
+      if (anchor) anchors.add(p);
+    };
+    for (const piece of routes[w]!) {
+      if ("at" in piece) {
+        push(onPlate(piece.band)(piece.at));
+        continue;
+      }
+      // The wire drops straight off one plate edge, runs along its own lane and drops straight onto the next.
+      const leave = onPlate(piece.fromBand)({ x: piece.from.x, y: piece.fromBand === piece.gap ? bands[piece.fromBand]!.bottom : bands[piece.fromBand]!.top });
+      const enter = onPlate(piece.toBand)({ x: piece.to.x, y: piece.toBand === piece.gap ? bands[piece.toBand]!.bottom : bands[piece.toBand]!.top });
+      const y = laneY(piece.gap, piece.lane);
+      push(leave, true);
+      push({ x: leave.x, y }, true);
+      push({ x: enter.x, y }, true);
+      push(enter, true);
+      lanes.set(piece.gap, { x: (leave.x + enter.x) / 2, y });
+    }
+    // A jog shorter than a few px is only a rounding of elk's spacing after the squash; it reads as a stray stub.
+    for (let i = 1; i < path.length - 1; ) {
+      const short = Math.hypot(path[i]!.x - path[i - 1]!.x, path[i]!.y - path[i - 1]!.y) < MIN_SEGMENT || Math.hypot(path[i + 1]!.x - path[i]!.x, path[i + 1]!.y - path[i]!.y) < MIN_SEGMENT;
+      if (short && !anchors.has(path[i]!)) {
+        path.splice(i, 1);
+        i = Math.max(1, i - 1);
+      } else {
+        i++;
+      }
+    }
+
     const lines = chipLines(e.label);
     const size = chipSize(lines);
     const centre = { x: e.labelBox.x + e.labelBox.width / 2, y: e.labelBox.y + e.labelBox.height / 2 };
-    const at = regionAt(regions, centre.y).at(centre);
+    const where = locate(bands, centre.y);
+    const at = "gap" in where ? (lanes.get(where.gap) ?? onPlate(where.gap)(centre)) : onPlate(where.band)(centre);
     return {
       id: e.id,
       source: e.source,
@@ -292,7 +329,7 @@ export function buildScene(layout: PlateLayout): Scene {
       label: e.label,
       citation: e.citation,
       explanation: e.explanation,
-      path: projectPolyline(regions, e.route),
+      path,
       chip: { at, lines, box: boxAround(at, size.width, size.height) },
     };
   });
@@ -318,28 +355,43 @@ export interface View {
   height: number;
 }
 
-// The view keeps its centre inside the scene, so zooming in never shows empty space around the plates.
-export function viewFor(bounds: Box, zoom: number, centre: Point): View {
-  const width = (bounds.x1 - bounds.x0) / zoom;
-  const height = (bounds.y1 - bounds.y0) / zoom;
+// The scene is seen through a canvas-sized viewBox: `origin` is the scene point at the canvas's top-left and
+// `k` the screen pixels per scene unit (Fit scale times the zoom step). `free` is the part of the canvas that no island covers.
+const KEEP_VISIBLE = 80;
+const REVEAL_MARGIN = 12;
+
+export function viewFor(canvas: { width: number; height: number }, k: number, origin: Point): View {
+  return { x: origin.x, y: origin.y, width: canvas.width / k, height: canvas.height / k };
+}
+
+// Fit: the scene centred across the free area and its top at the free area's top.
+export function homeOrigin(bounds: Box, free: Box, k: number): Point {
+  return { x: (bounds.x0 + bounds.x1) / 2 - (free.x0 + free.x1) / (2 * k), y: bounds.y0 - free.y0 / k };
+}
+
+// Keeps at least KEEP_VISIBLE px of the scene inside the free area on each axis.
+export function clampOrigin(bounds: Box, free: Box, k: number, origin: Point): Point {
   const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
   return {
-    x: clamp(centre.x - width / 2, bounds.x0, bounds.x1 - width),
-    y: clamp(centre.y - height / 2, bounds.y0, bounds.y1 - height),
-    width,
-    height,
+    x: clamp(origin.x, bounds.x0 - (free.x1 - KEEP_VISIBLE) / k, bounds.x1 - (free.x0 + KEEP_VISIBLE) / k),
+    y: clamp(origin.y, bounds.y0 - (free.y1 - KEEP_VISIBLE) / k, bounds.y1 - (free.y0 + KEEP_VISIBLE) / k),
   };
 }
 
-export function centreOf(bounds: Box): Point {
-  return { x: (bounds.x0 + bounds.x1) / 2, y: (bounds.y0 + bounds.y1) / 2 };
+// Changes the scale while the scene point under `anchor` (canvas px) stays under it.
+export function zoomAround(origin: Point, k: number, nextK: number, anchor: Point): Point {
+  return { x: origin.x + anchor.x / k - anchor.x / nextK, y: origin.y + anchor.y / k - anchor.y / nextK };
 }
 
-// Moves the view just enough that a focused box is inside it; the view is left alone when it already is.
-export function followBox(view: View, target: Box): Point {
-  const shift = (lo: number, hi: number, vLo: number, vHi: number) => (lo < vLo ? lo - vLo : hi > vHi ? hi - vHi : 0);
+// Moves the origin just enough that a box is inside the free area; it is left alone when it already is.
+export function revealBox(origin: Point, k: number, free: Box, target: Box): Point {
+  const shift = (lo: number, hi: number, freeLo: number, freeHi: number) => {
+    const from = lo * k;
+    const to = hi * k;
+    return from < freeLo + REVEAL_MARGIN ? (from - freeLo - REVEAL_MARGIN) / k : to > freeHi - REVEAL_MARGIN ? (to - freeHi + REVEAL_MARGIN) / k : 0;
+  };
   return {
-    x: view.x + view.width / 2 + shift(target.x0, target.x1, view.x, view.x + view.width),
-    y: view.y + view.height / 2 + shift(target.y0, target.y1, view.y, view.y + view.height),
+    x: origin.x + shift(target.x0 - origin.x, target.x1 - origin.x, free.x0, free.x1),
+    y: origin.y + shift(target.y0 - origin.y, target.y1 - origin.y, free.y0, free.y1),
   };
 }

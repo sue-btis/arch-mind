@@ -1,40 +1,40 @@
-import { LAYERS, PICTOGRAMS } from "@arch-mind/rules/model";
+import { LAYERS, PICTOGRAMS, type Concept } from "@arch-mind/rules/model";
+import { designators, pictogramFor } from "./layout.ts";
 import type { OpenConcept } from "./LayerView.tsx";
-import type { PlateLayout } from "./layout.ts";
 
 const MEANING = new Map(PICTOGRAMS.map((p) => [p.id, p.meaning]));
 
 // The plates are a picture; this list carries the same concepts, pictograms and relations as text for keyboard and screen reader use.
-export function ConceptList({ layout, onOpen }: { layout: PlateLayout; onOpen: OpenConcept }) {
-  const names = new Map(layout.nodes.map((n) => [n.id, `${n.designator} ${n.title}`]));
-  const ordered = LAYERS.flatMap((layer) => layout.nodes.filter((n) => n.layer === layer));
+export function ConceptList({ concepts, onOpen }: { concepts: Concept[]; onOpen: OpenConcept }) {
+  const designator = designators(concepts);
+  const names = new Map(concepts.map((c) => [c.id, `${designator.get(c.id)} ${c.title}`]));
+  const relations = new Map(concepts.map((c) => [c.id, c.relations.filter((r) => names.has(r.to) && r.to !== c.id)]));
+  const ordered = LAYERS.flatMap((layer) => concepts.filter((c) => c.layer === layer));
   return (
-    <details data-testid="concept-list" className="border-t border-line px-4 py-2 text-[13px]">
+    <details data-testid="concept-list" className="border-t border-line pt-2 text-[13px]">
       <summary className="cursor-pointer py-1 font-medium">
-        Concepts and relations ({layout.nodes.length} concepts, {layout.edges.length} relations)
+        Concepts and relations ({concepts.length} concepts, {[...relations.values()].reduce((n, r) => n + r.length, 0)} relations)
       </summary>
       <ul className="mt-2 flex flex-col gap-3">
-        {ordered.map((n) => (
-          <li key={n.id}>
+        {ordered.map((c) => (
+          <li key={c.id}>
             <button
               type="button"
               className="rounded text-left font-medium underline decoration-line underline-offset-4 hover:decoration-ink"
-              onClick={(e) => onOpen(n.id, e.currentTarget)}
+              onClick={(e) => onOpen(c.id, e.currentTarget)}
             >
-              {names.get(n.id)}
+              {names.get(c.id)}
             </button>
             <span className="text-ink-muted">
               {" "}
-              · {n.layer} layer · pictogram: {MEANING.get(n.pictogram) ?? n.pictogram}
+              · {c.layer} layer · pictogram: {MEANING.get(pictogramFor(c)) ?? pictogramFor(c)}
             </span>
             <ul className="ml-4 mt-1 list-disc text-ink-muted">
-              {layout.edges
-                .filter((e) => e.source === n.id)
-                .map((e) => (
-                  <li key={e.id}>
-                    <span className="text-ink">{e.label}</span> → {names.get(e.target)}
-                  </li>
-                ))}
+              {relations.get(c.id)!.map((r) => (
+                <li key={`${r.type}>${r.to}`}>
+                  <span className="text-ink">{r.type}</span> → {names.get(r.to)}
+                </li>
+              ))}
             </ul>
           </li>
         ))}

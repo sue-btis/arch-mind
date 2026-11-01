@@ -91,7 +91,10 @@ describe("layer view width (TST-023, AC-026)", () => {
         return {
           boardWidth: document.querySelector('[data-testid="board"]')!.getBoundingClientRect().width,
           sidebarWidth: document.querySelector("aside")!.getBoundingClientRect().width,
-          drawnWidth: svg.getBoundingClientRect().width,
+          platesLeft: Math.min(...[...document.querySelectorAll("[data-plate]")].map((p) => p.getBoundingClientRect().left)),
+          platesRight: Math.max(...[...document.querySelectorAll("[data-plate]")].map((p) => p.getBoundingClientRect().right)),
+          filtersRight: document.querySelector("aside")!.getBoundingClientRect().right,
+          viewportWidth: document.documentElement.clientWidth,
           scale: Number(svg.getAttribute("data-fit-scale")),
           projectedWidth: Number(svg.getAttribute("data-projected-width")),
         };
@@ -99,7 +102,8 @@ describe("layer view width (TST-023, AC-026)", () => {
       process.stdout.write(`TST-032 Chrome Fit scale ${m.scale} for a projected width of ${m.projectedWidth} px in a ${m.boardWidth} px board (sidebar ${m.sidebarWidth} px)\n`);
       expect(m.sidebarWidth).toBeLessThanOrEqual(200);
       expect(m.scale).toBeGreaterThanOrEqual(0.85);
-      expect(m.drawnWidth).toBeLessThanOrEqual(m.boardWidth);
+      expect(m.platesLeft).toBeGreaterThanOrEqual(m.filtersRight);
+      expect(m.platesRight).toBeLessThanOrEqual(m.viewportWidth);
     } finally {
       await close();
     }
@@ -141,6 +145,24 @@ describe("filters (AC-1)", () => {
       await page.waitForSelector("aside fieldset > legend");
       const legends = await page.locator("aside fieldset > legend").allTextContents();
       expect(legends).toEqual(["Layers", "Domains", "Concerns"]);
+    } finally {
+      await close();
+    }
+  });
+});
+
+describe("matrix taller than the window", () => {
+  it("scrolls its last row clear of the legend island", async () => {
+    const { page, close } = await openPage(running, "light");
+    try {
+      // A short window makes the 13 rows overflow, so the scroller has to stop above the bottom islands.
+      await page.setViewportSize({ width: VIEWPORT.width, height: 420 });
+      await page.getByRole("button", { name: "Matrix" }).click();
+      await page.waitForSelector("tbody tr");
+      await page.locator("tbody tr").last().evaluate((row) => row.closest("table")!.parentElement!.closest("div.overflow-auto")!.scrollTo(0, 1e6));
+      const row = (await page.locator("tbody tr").last().boundingBox())!;
+      const legend = (await page.locator("section[aria-labelledby=wires-title]").boundingBox())!;
+      expect(row.y + row.height).toBeLessThanOrEqual(legend.y);
     } finally {
       await close();
     }

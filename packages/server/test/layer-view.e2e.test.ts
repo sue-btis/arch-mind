@@ -89,15 +89,15 @@ describe.each(["light", "dark"] as const)("layer plates at 1366 x 768, %s mode (
           px: Number.parseFloat(getComputedStyle(t).fontSize) * screenScale(t as SVGTextElement),
         }));
         const root = document.documentElement;
-        const board = document.querySelector('[data-testid="board"]')!.getBoundingClientRect();
         return {
           scrollWidth: root.scrollWidth,
           clientWidth: root.clientWidth,
           fitMessages: document.querySelectorAll('[data-testid="fit-message"]').length,
           scale: Number(svg.getAttribute("data-fit-scale")),
           projectedWidth: Number(svg.getAttribute("data-projected-width")),
-          svgRight: svg.getBoundingClientRect().right,
-          boardRight: board.right,
+          platesLeft: Math.min(...[...document.querySelectorAll("[data-plate]")].map((p) => p.getBoundingClientRect().left)),
+          platesRight: Math.max(...[...document.querySelectorAll("[data-plate]")].map((p) => p.getBoundingClientRect().right)),
+          filtersRight: document.querySelector("aside")!.getBoundingClientRect().right,
           plates,
           concepts,
           chips,
@@ -110,7 +110,8 @@ describe.each(["light", "dark"] as const)("layer plates at 1366 x 768, %s mode (
 
       expect(m.scale).toBeGreaterThanOrEqual(FLOOR);
       expect(m.scrollWidth).toBeLessThanOrEqual(m.clientWidth);
-      expect(m.svgRight).toBeLessThanOrEqual(m.boardRight);
+      expect(m.platesLeft).toBeGreaterThanOrEqual(m.filtersRight);
+      expect(m.platesRight).toBeLessThanOrEqual(m.clientWidth);
       expect(m.fitMessages).toBe(0);
       expect(m.fonts).toContain("Inter");
 
@@ -186,6 +187,125 @@ describe("zoom and Fit (TST-023, AC-027)", () => {
         return box.left >= svg.left - 1 && box.right <= svg.right + 1 && box.top >= svg.top - 1 && box.bottom <= svg.bottom + 1;
       });
       expect(inside).toBe(true);
+    } finally {
+      await close();
+    }
+  });
+});
+
+describe("full-window canvas (AC-3, AC-4, AC-5, AC-6)", () => {
+  const viewBox = (page: Page) =>
+    page.getByTestId("plates").evaluate((svg) => {
+      const v = (svg as SVGSVGElement).viewBox.baseVal;
+      return { x: v.x, y: v.y, width: v.width };
+    });
+  const fitScale = (page: Page) => page.getByTestId("plates").getAttribute("data-fit-scale").then(Number);
+
+  it("fills the window without a page scrollbar and floats the islands over it", async () => {
+    const { page, close } = await open(running, "light");
+    try {
+      const m = await page.evaluate(() => {
+        const root = document.documentElement;
+        const rect = (selector: string) => document.querySelector(selector)!.getBoundingClientRect();
+        return {
+          scrollable: [root.scrollWidth - root.clientWidth, root.scrollHeight - root.clientHeight],
+          board: rect('[data-testid="board"]'),
+          filters: rect("aside"),
+          views: rect('[role="group"][aria-label="View"]'),
+          zoom: rect('[role="group"][aria-label="Zoom"]'),
+        };
+      });
+      expect(m.scrollable[0]).toBeLessThanOrEqual(0);
+      expect(m.scrollable[1]).toBeLessThanOrEqual(0);
+      expect([m.board.width, m.board.height]).toEqual([VIEWPORT.width, VIEWPORT.height]);
+      expect(m.filters.width).toBeLessThanOrEqual(200);
+      expect(m.filters.left).toBe(16);
+      expect(m.views.top).toBeLessThan(m.filters.top);
+      expect(m.zoom.right).toBeCloseTo(VIEWPORT.width - 16, 0);
+      expect(m.zoom.bottom).toBeCloseTo(VIEWPORT.height - 16, 0);
+      expect(await page.getByTestId("fit-message").count()).toBe(0);
+    } finally {
+      await close();
+    }
+  });
+
+  it("refits when the filters island is collapsed and expanded", async () => {
+    const { page, close } = await open(running, "light");
+    try {
+      const open1 = await fitScale(page);
+      expect(open1).toBeCloseTo((VIEWPORT.width - 232 - 16) / Number(await page.getByTestId("plates").getAttribute("data-projected-width")), 2);
+      await page.getByRole("button", { name: "Filters", exact: true }).click();
+      expect(await page.getByRole("checkbox", { name: "client", exact: true }).count()).toBe(0);
+      expect(await fitScale(page)).toBeGreaterThan(open1);
+      await page.waitForTimeout(400);
+      await screenshot(page, "layer-plates-filters-collapsed-1366x768-light.png");
+      await page.getByRole("button", { name: "Filters", exact: true }).click();
+      expect(await fitScale(page)).toBeCloseTo(open1, 3);
+    } finally {
+      await close();
+    }
+  });
+
+  it("pans by dragging and by the wheel at Fit, and steps the zoom with Ctrl and the wheel at the pointer", async () => {
+    const { page, close } = await open(running, "light");
+    try {
+      const fit = await viewBox(page);
+      await page.mouse.move(1300, 400);
+      await page.mouse.down();
+      await page.mouse.move(1200, 320, { steps: 4 });
+      await page.mouse.up();
+      const dragged = await viewBox(page);
+      expect(dragged.width).toBeCloseTo(fit.width, 3);
+      expect(dragged.x).toBeGreaterThan(fit.x);
+      expect(dragged.y).toBeGreaterThan(fit.y);
+      expect(await page.getByRole("button", { name: "Fit", exact: true }).isDisabled()).toBe(false);
+
+      await page.mouse.wheel(0, 120);
+      const wheeled = await viewBox(page);
+      expect(wheeled.y).toBeGreaterThan(dragged.y);
+      expect(wheeled.width).toBeCloseTo(fit.width, 3);
+
+      await page.mouse.move(700, 300);
+      await page.keyboard.down("Control");
+      await page.mouse.wheel(0, -120);
+      await page.keyboard.up("Control");
+      expect((await viewBox(page)).width).toBeCloseTo(fit.width / 1.5, 1);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+    } finally {
+      await close();
+    }
+  });
+
+  it("keeps a revealed concept above the legend and zoom islands", async () => {
+    const { page, close } = await open(running, "light");
+    try {
+      await page.getByRole("button", { name: "Filters", exact: true }).click();
+      await page.waitForTimeout(400);
+      const last = page.getByTestId("concept").last();
+      await last.focus();
+      await page.waitForTimeout(400);
+      const concept = (await last.boundingBox())!;
+      const legend = (await page.locator("section[aria-labelledby=wires-title]").boundingBox())!;
+      const zoom = (await page.getByRole("group", { name: "Zoom" }).boundingBox())!;
+      expect(concept.y + concept.height).toBeLessThanOrEqual(Math.min(legend.y, zoom.y));
+    } finally {
+      await close();
+    }
+  });
+
+  it("keeps a selected concept out from under the detail sheet", async () => {
+    const { page, close } = await open(running, "light");
+    try {
+      for (let i = 0; i < 3; i++) await page.getByRole("button", { name: "Zoom in" }).click();
+      const last = page.getByTestId("concept").last();
+      await last.focus();
+      await page.keyboard.press("Enter");
+      const dialog = page.getByTestId("concept-detail");
+      await dialog.waitFor();
+      await page.waitForTimeout(400);
+      const sheetLeft = (await dialog.boundingBox())!.x;
+      const concept = (await last.boundingBox())!;
+      expect(concept.x + concept.width).toBeLessThanOrEqual(sheetLeft);
     } finally {
       await close();
     }

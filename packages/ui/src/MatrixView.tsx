@@ -1,5 +1,5 @@
 import type { Concept } from "@arch-mind/rules/model";
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo, useRef } from "react";
 import { FitMessage } from "./FitMessage.tsx";
 import type { OpenConcept } from "./LayerView.tsx";
 import { CELL_SIZE, ROW_HEADER_WIDTH, buildMatrix, matrixWidth } from "./matrix.ts";
@@ -10,24 +10,21 @@ export function MatrixView({
   concepts,
   boardWidth,
   onOpen,
-  onMeasure,
 }: {
   concepts: Concept[];
   boardWidth: number;
   onOpen: OpenConcept;
-  onMeasure: (needed: number) => void;
 }) {
   const matrix = useMemo(() => buildMatrix(concepts), [concepts]);
   const container = useRef<HTMLDivElement>(null);
   const { open, targetProps } = useRelationPopover(container);
   const needed = matrixWidth(matrix.headers.length);
-  useEffect(() => onMeasure(needed), [needed, onMeasure]);
 
   if (boardWidth > 0 && needed > boardWidth) return <FitMessage count={concepts.length} needed={needed} available={boardWidth} />;
   const label = (i: number) => `${matrix.headers[i]!.designator} ${matrix.headers[i]!.title}`;
 
   return (
-    <div ref={container} className="relative">
+    <div ref={container} className="relative w-fit border border-line bg-panel">
       <table className="border-collapse text-[13px]" style={{ tableLayout: "fixed", width: needed }}>
         <caption className="sr-only">Relations from the row concept to the column concept</caption>
         <colgroup>
