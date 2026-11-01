@@ -20,8 +20,15 @@ export {
 } from "./store.ts";
 export {
   addDays,
+  appendReviewLine,
   loadConceptDetail,
+  loadDueQuestions,
   loadReviewLines,
+  parseReviewRequest,
+  recordReview,
   replayQuestionStates,
+  selectDue,
   type ConceptDetailOutcome,
+  type RecordOutcome,
+  type ReviewRequest,
 } from "./reviews.ts";
