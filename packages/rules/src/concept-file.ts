@@ -14,14 +14,11 @@ export const seeIHeadingLines = new Set(Object.values(HEADINGS));
 // Key order follows concept.schema.json so hand diffs stay stable; episodes is
 // written only when non-empty (an absent key reads back as []).
 export function serializeConcept(concept: Concept): string {
-  const front: Record<string, unknown> = {
-    id: concept.id,
-    title: concept.title,
-    layer: concept.layer,
-    domains: concept.domains,
-    concerns: concept.concerns,
-    relations: concept.relations,
-  };
+  const front: Record<string, unknown> = { id: concept.id, title: concept.title, layer: concept.layer };
+  if (concept.pictogram !== undefined) front.pictogram = concept.pictogram;
+  front.domains = concept.domains;
+  front.concerns = concept.concerns;
+  front.relations = concept.relations;
   if (concept.episodes.length > 0) front.episodes = concept.episodes;
   front.recall = concept.recall;
 

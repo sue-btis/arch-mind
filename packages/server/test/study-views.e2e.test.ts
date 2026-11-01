@@ -59,37 +59,47 @@ async function openPage(server: RunningServer, scheme: "light" | "dark" = "light
   return { page, close: () => context.close() };
 }
 
-const connectors = (page: Page) => page.locator(".react-flow__node-connector");
+const concepts = (page: Page) => page.getByTestId("concept");
+const wires = (page: Page) => page.getByTestId("wire");
 const horizontalOverflow = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 
 async function hoverWire(page: Page, selector: string) {
+  // Wires cross, so aim at a point of this wire that no other wire's hit area covers.
   const point = await page.locator(selector).evaluate((g) => {
-    const path = g.querySelector('path[stroke="transparent"]') as SVGPathElement;
-    const at = path.getPointAtLength(path.getTotalLength() / 2);
+    const path = g.querySelector("path.hit") as SVGPathElement;
     const m = path.getScreenCTM()!;
-    return { x: at.x * m.a + at.y * m.c + m.e, y: at.x * m.b + at.y * m.d + m.f };
+    const total = path.getTotalLength();
+    for (const t of [0.5, 0.4, 0.6, 0.3, 0.7, 0.2, 0.8, 0.1, 0.9]) {
+      const at = path.getPointAtLength(total * t);
+      const x = at.x * m.a + at.y * m.c + m.e;
+      const y = at.x * m.b + at.y * m.d + m.f;
+      if (document.elementFromPoint(x, y)?.closest(".wire") === g) return { x, y };
+    }
+    throw new Error("no uncovered point on the wire");
   });
   await page.mouse.move(point.x, point.y);
 }
 
-describe("layer view width (ASM-1, Amendment 1)", () => {
-  it("draws the TST-032 layout within 95% of the board width at 1366 x 768", async () => {
+describe("layer view width (TST-023, AC-026)", () => {
+  it("draws the TST-032 plates at a Fit scale of at least 0.85 inside the board at 1366 x 768", async () => {
     const { page, close } = await openPage(running);
     try {
-      await connectors(page).first().waitFor();
-      await page.waitForFunction((n) => document.querySelectorAll(".react-flow__edge").length === n, tst032RelationCount);
+      await concepts(page).first().waitFor();
+      await wires(page).first().waitFor();
       const m = await page.evaluate(() => {
-        const rects = [...document.querySelectorAll(".react-flow__node-connector")].map((n) => n.getBoundingClientRect());
+        const svg = document.querySelector('[data-testid="plates"]')!;
         return {
           boardWidth: document.querySelector('[data-testid="board"]')!.getBoundingClientRect().width,
           sidebarWidth: document.querySelector("aside")!.getBoundingClientRect().width,
-          layoutWidth: Math.max(...rects.map((r) => r.right)) - Math.min(...rects.map((r) => r.left)) + 32,
+          drawnWidth: svg.getBoundingClientRect().width,
+          scale: Number(svg.getAttribute("data-fit-scale")),
+          projectedWidth: Number(svg.getAttribute("data-projected-width")),
         };
       });
-      process.stdout.write(`TST-032 Chrome layout ${m.layoutWidth} px in a ${m.boardWidth} px board (sidebar ${m.sidebarWidth} px)
-`);
+      process.stdout.write(`TST-032 Chrome Fit scale ${m.scale} for a projected width of ${m.projectedWidth} px in a ${m.boardWidth} px board (sidebar ${m.sidebarWidth} px)\n`);
       expect(m.sidebarWidth).toBeLessThanOrEqual(200);
-      expect(m.layoutWidth).toBeLessThanOrEqual(m.boardWidth * 0.95);
+      expect(m.scale).toBeGreaterThanOrEqual(0.85);
+      expect(m.drawnWidth).toBeLessThanOrEqual(m.boardWidth);
     } finally {
       await close();
     }
@@ -100,13 +110,13 @@ describe("filters (AC-1)", () => {
   it("changes the drawn connectors and wires in the layer view and the rows in the matrix", async () => {
     const { page, close } = await openPage(running);
     try {
-      await connectors(page).first().waitFor();
-      await page.waitForFunction((n) => document.querySelectorAll(".react-flow__edge").length === n, tst032RelationCount);
-      expect(await connectors(page).count()).toBe(13);
+      await concepts(page).first().waitFor();
+      await page.waitForFunction((n) => document.querySelectorAll('[data-testid="wire"]').length === n, tst032RelationCount);
+      expect(await concepts(page).count()).toBe(13);
 
       await page.getByRole("checkbox", { name: "client", exact: true }).check();
-      await page.waitForFunction((n) => document.querySelectorAll(".react-flow__node-connector").length === n, 6);
-      await page.waitForFunction((n) => document.querySelectorAll(".react-flow__edge").length === n, clientRelations.length);
+      await page.waitForFunction((n) => document.querySelectorAll('[data-testid="concept"]').length === n, 6);
+      await page.waitForFunction((n) => document.querySelectorAll('[data-testid="wire"]').length === n, clientRelations.length);
 
       await page.getByRole("button", { name: "Matrix" }).click();
       expect(await page.locator("tbody tr").count()).toBe(6);
@@ -114,10 +124,12 @@ describe("filters (AC-1)", () => {
       await page.getByRole("checkbox", { name: "mobile", exact: true }).check();
       expect(await page.locator("tbody tr").count()).toBe(0);
       await page.getByRole("button", { name: "Layers" }).click();
-      await page.waitForFunction(() => document.querySelectorAll(".react-flow__node-connector").length === 0);
+      await page.waitForFunction(() => document.querySelectorAll('[data-testid="concept"]').length === 0);
+      await page.waitForSelector("[data-plate]");
+      expect(await page.locator("[data-plate]").count()).toBe(4);
 
       await page.getByRole("button", { name: "Clear filters" }).click();
-      await page.waitForFunction((n) => document.querySelectorAll(".react-flow__node-connector").length === n, 13);
+      await page.waitForFunction((n) => document.querySelectorAll('[data-testid="concept"]').length === n, 13);
     } finally {
       await close();
     }
@@ -160,7 +172,7 @@ describe("relation details (AC-3)", () => {
   it("shows source and explanation when a wire is hovered", async () => {
     const { page, close } = await openPage(running);
     try {
-      await page.waitForFunction((n) => document.querySelectorAll(".react-flow__edge").length === n, tst032RelationCount);
+      await page.waitForFunction((n) => document.querySelectorAll('[data-testid="wire"]').length === n, tst032RelationCount);
       await hoverWire(page, '.wire[aria-label*="__Host- cookie prefix to"]');
       const popover = page.getByTestId("relation-popover");
       await popover.waitFor();
@@ -176,7 +188,7 @@ describe("relation details (AC-3)", () => {
   it("shows the same details when a wire is focused, and keeps a pressed one open until Escape", async () => {
     const { page, close } = await openPage(running);
     try {
-      await page.waitForFunction((n) => document.querySelectorAll(".react-flow__edge").length === n, tst032RelationCount);
+      await page.waitForFunction((n) => document.querySelectorAll('[data-testid="wire"]').length === n, tst032RelationCount);
       const wire = page.locator('.wire[aria-label*="__Host- cookie prefix to"]');
       await wire.focus();
       const popover = page.getByTestId("relation-popover");
@@ -234,7 +246,7 @@ describe.each(["light", "dark"] as const)("concept detail at 1366 x 768, %s mode
   it("opens from a clicked connector with SEE-I, relations, episodes, facets and each question's box and due date", async () => {
     const { page, close } = await openPage(running, scheme);
     try {
-      const opener = connectors(page).getByRole("button", { name: /Secure cookie attribute/ });
+      const opener = page.locator('[data-testid="concept"][data-id="secure-attr"]');
       await opener.waitFor();
       await opener.click();
       const dialog = page.getByRole("dialog", { name: "Secure cookie attribute" });
@@ -294,49 +306,61 @@ describe("problems and hand edits (AC-8)", () => {
       const file = join(store, "concepts", "secure-attr.md");
       await writeFile(file, (await readFile(file, "utf8")).replace("title: Secure cookie attribute", "title: Secure cookie attribute (hand edited)"));
       await page.reload();
-      await connectors(page).getByRole("button", { name: /Secure cookie attribute \(hand edited\)/ }).waitFor();
+      await page.locator('[data-testid="concept"][aria-label$="Secure cookie attribute (hand edited)"]').waitFor();
     } finally {
       await close();
     }
   });
 });
 
-describe("keyboard operation (AC-9)", () => {
-  it("reaches connectors with Tab and shows a visible focus ring", async () => {
+describe("keyboard operation (AC-9, AC-028)", () => {
+  it("reaches concepts and wires with Tab and shows a visible focus mark on each", async () => {
     const { page, close } = await openPage(running);
     try {
-      await connectors(page).first().waitFor();
-      for (let i = 0; i < 40; i++) {
+      await concepts(page).first().waitFor();
+      await wires(page).first().waitFor();
+      const seen = new Set<string>();
+      for (let i = 0; i < 80 && seen.size < 2; i++) {
         await page.keyboard.press("Tab");
-        if (await page.evaluate(() => document.activeElement?.closest(".react-flow__node-connector") !== null)) break;
+        const mark = await page.evaluate(() => {
+          const el = document.activeElement!;
+          const concept = el.closest('[data-testid="concept"]');
+          const wire = el.closest('[data-testid="wire"]');
+          if (concept) {
+            const ring = getComputedStyle(concept.querySelector(".focus")!);
+            return { kind: "concept", visible: ring.display !== "none" && Number.parseFloat(ring.strokeWidth) >= 2 };
+          }
+          if (wire) return { kind: "wire", visible: Number.parseFloat(getComputedStyle(wire.querySelector(".line")!).strokeWidth) >= 2.5 };
+          return null;
+        });
+        if (mark) {
+          expect(mark.visible, mark.kind).toBe(true);
+          seen.add(mark.kind);
+        }
       }
-      const ring = await page.evaluate(() => {
-        const style = getComputedStyle(document.activeElement!);
-        return { inNode: document.activeElement!.closest(".react-flow__node-connector") !== null, width: style.outlineWidth, style: style.outlineStyle };
-      });
-      expect(ring.inNode).toBe(true);
-      expect(ring.style).not.toBe("none");
-      expect(ring.width).toBe("2px");
+      expect([...seen].sort()).toEqual(["concept", "wire"]);
     } finally {
       await close();
     }
   });
 });
 
-describe("width guard (TST-014, AC-4)", () => {
-  it("shows the fit message and no board for a layout wider than the screen, then draws once narrowed", async () => {
+describe("width guard (TST-023, AC-026)", () => {
+  it("shows the narrower-filters message and no plates for a view needing a Fit scale below 0.85, then draws once narrowed", async () => {
     const { page, close } = await openPage(wide);
     try {
       const message = page.getByTestId("fit-message");
       await message.waitFor();
       expect(await message.textContent()).toMatch(/narrow/);
-      expect(await connectors(page).count()).toBe(0);
+      expect(await message.textContent()).toMatch(/85 %/);
+      expect(await concepts(page).count()).toBe(0);
+      expect(await page.getByTestId("plates").count()).toBe(0);
       expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
 
       await page.getByRole("checkbox", { name: "client", exact: true }).check();
-      await connectors(page).first().waitFor();
+      await concepts(page).first().waitFor();
       expect(await message.count()).toBe(0);
-      expect(await connectors(page).count()).toBe(1);
+      expect(await concepts(page).count()).toBe(1);
     } finally {
       await close();
     }

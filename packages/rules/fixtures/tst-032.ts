@@ -6,6 +6,22 @@ import type { Concept, Layer, Relation } from "../src/model.ts";
 
 const CONFIRMED = "2026-10-30";
 
+const PICTOGRAM_OF: Record<string, string> = {
+  "host-prefix": "cookie-house",
+  "secure-attr": "cookie-lock",
+  "secure-context": "locked-window",
+  "webkit-policy": "policy-sheet",
+  uir: "lock-upgrade",
+  lighthouse: "lighthouse",
+  https: "secure-pipe",
+  "tls-cert": "certificate",
+  "self-signed": "signed-document",
+  mkcert: "certificate-authority",
+  hsts: "shield",
+  "next-start": "terminal-play",
+  csp: "header-filter",
+};
+
 function concept(
   id: string,
   title: string,
@@ -19,6 +35,7 @@ function concept(
     id,
     title,
     layer,
+    ...(PICTOGRAM_OF[id] ? { pictogram: PICTOGRAM_OF[id] } : {}),
     domains: ["web"],
     concerns: ["security"],
     seeI: { statement, elaboration, example, illustration },
@@ -303,7 +320,7 @@ export const tst032Concepts: Concept[] = [
 
 export const tst032RelationCount = tst032Concepts.reduce((n, c) => n + c.relations.length, 0);
 
-// A hub related to 13 server concepts: elk ranks the spokes together in one row, so the layout is far wider than 1366 px.
+// A hub related to 13 server concepts: elk ranks the spokes together in one row, so the plates are far wider than the board.
 export const overWideConcepts: Concept[] = [
   concept(
     "wide-hub",

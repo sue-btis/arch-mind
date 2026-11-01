@@ -1,7 +1,7 @@
 import { open, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Concept, QuestionState, ReviewLine, RuleError } from "./model.ts";
-import { StoreError, loadConcept, loadConcepts, loadFacets, localDate } from "./store.ts";
+import { StoreError, loadConcept, loadConcepts, loadFacets, localDate, withDerived } from "./store.ts";
 
 const QUESTION_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*#q[0-9]+$/;
 const DATE_TIME = /^(\d{4}-\d{2}-\d{2})[Tt](\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:[Zz]|[+-](\d{2}):(\d{2}))$/;
@@ -78,7 +78,7 @@ export async function loadConceptDetail(storePath: string, id: unknown): Promise
   const loaded = await loadConcept(storePath, id);
   if (!loaded.ok) return loaded;
   const [{ leitnerIntervalsDays }, lines] = await Promise.all([loadFacets(storePath), loadReviewLines(storePath)]);
-  return { ok: true, concept: loaded.concept, questions: replayQuestionStates(loaded.concept, lines, leitnerIntervalsDays) };
+  return { ok: true, concept: withDerived(loaded.concept), questions: replayQuestionStates(loaded.concept, lines, leitnerIntervalsDays) };
 }
 
 // Append mode and one write per line. Only the last byte is read, so a hand-edited log without a final newline

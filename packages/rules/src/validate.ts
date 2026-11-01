@@ -83,6 +83,7 @@ export interface SaveContext {
 }
 
 const CONCEPT_KEYS = ["id", "title", "layer", "domains", "concerns", "seeI", "relations", "episodes", "recall"];
+const STORED_KEYS = [...CONCEPT_KEYS, "pictogram"];
 const RELATION_KEYS = ["type", "to", "source", "explanation"];
 
 export function validateNewConcept(input: unknown, ctx: SaveContext): RuleError[] {
@@ -201,10 +202,11 @@ export function validateStoredShape(value: unknown): RuleError[] {
     add("", "invalid_shape", "must be an object");
     return errors;
   }
-  rejectUnknownKeys(value, CONCEPT_KEYS, "", add);
+  rejectUnknownKeys(value, STORED_KEYS, "", add);
   if (!isId(value.id)) add("/id", "invalid_shape", "must be a lowercase kebab-case id");
   if (isBlank(value.title)) add("/title", "invalid_shape", "must be a non-empty string");
   if (!(LAYERS as readonly string[]).includes(value.layer as string)) add("/layer", "invalid_shape", "unknown layer");
+  if (value.pictogram !== undefined && !isId(value.pictogram)) add("/pictogram", "invalid_shape", "must be a lowercase kebab-case id");
   checkStringList(value.domains, "/domains", add);
   checkStringList(value.concerns, "/concerns", add);
 

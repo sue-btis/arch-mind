@@ -32,7 +32,7 @@ export function App() {
   const [boardWidth, setBoardWidth] = useState(0);
   const [needed, setNeeded] = useState<number | null>(null);
   const board = useRef<HTMLDivElement>(null);
-  const opener = useRef<HTMLElement | null>(null);
+  const opener = useRef<HTMLElement | SVGElement | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -55,7 +55,7 @@ export function App() {
   const shown = useMemo(() => (data ? filterConcepts(data.concepts, filters) : []), [data, filters]);
   const titles = useMemo(() => new Map(data?.concepts.map((c) => [c.id, c.title]) ?? []), [data]);
 
-  const open = useCallback((id: string, from: HTMLElement) => {
+  const open = useCallback((id: string, from: HTMLElement | SVGElement) => {
     opener.current = from;
     setSelected(id);
   }, []);
@@ -74,7 +74,7 @@ export function App() {
         <h1 className="text-[15px] font-semibold tracking-tight">arch-mind</h1>
         <p className="text-[13px] tabular-nums text-ink-muted">
           {data ? `${data.concepts.length} concepts · ${relations} relations` : ""}
-          {data && data.problems.length > 0 ? ` · ${data.problems.length} ${data.problems.length === 1 ? "file" : "files"} could not be read` : ""}
+          {data && data.problems.length > 0 ? ` · ${data.problems.length} ${data.problems.length === 1 ? "file has" : "files have"} problems` : ""}
         </p>
       </header>
       {error && <p role="alert" className="text-correction">Could not load concepts: {error}</p>}
@@ -97,7 +97,7 @@ export function App() {
             </div>
             <p className="text-[13px] tabular-nums text-ink-muted" aria-live="polite">
               {data && view !== "review" ? `${shown.length} of ${data.concepts.length} concepts shown` : ""}
-              {data && view !== "review" && needed !== null && boardWidth > 0 ? ` · uses ${Math.round((needed / boardWidth) * 100)} % of the board` : ""}
+              {data && view !== "review" && needed !== null && boardWidth > 0 ? ` · uses ${Math.min(100, Math.round((needed / boardWidth) * 100))} % of the board` : ""}
             </p>
           </div>
           <div ref={board} hidden={view === "review"} className="border border-line bg-board" data-testid="board" data-view={view}>

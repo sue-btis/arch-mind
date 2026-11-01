@@ -8,7 +8,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { Ajv2020 } from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { configFilePath, loadConcepts, setupStore } from "@arch-mind/rules";
+import { PICTOGRAMS, configFilePath, loadConcept, loadConcepts, setupStore } from "@arch-mind/rules";
 
 const serverFile = fileURLToPath(new URL("../dist/server.mjs", import.meta.url));
 const docs = new URL("../../../docs/design/", import.meta.url);
@@ -80,6 +80,7 @@ describe("capture server contract (TST-003, AC-3, AC-4)", () => {
     expect(res.structuredContent).toEqual({
       concepts: [],
       facets: { domains: ["web", "mobile", "models"], concerns: ["security", "performance", "reliability"] },
+      pictograms: PICTOGRAMS,
     });
   });
 
@@ -100,7 +101,7 @@ describe("capture server contract (TST-003, AC-3, AC-4)", () => {
   it("list_concepts then returns the saved concept", async () => {
     const res = await client.callTool({ name: "list_concepts", arguments: {} });
     const validate = schemaAt("/$defs/tools/list_concepts/outputSchema");
-    expect(validate(res.structuredContent)).toBe(true);
+    expect(validate(res.structuredContent), JSON.stringify(validate.errors)).toBe(true);
     expect(res.structuredContent).toMatchObject({
       concepts: [{ id: "https", title: "HTTPS", layer: "network", domains: ["web"], concerns: ["security"] }],
     });
@@ -170,7 +171,7 @@ describe("get_concept and extend_concept (TST-009, AC-1, AC-2, AC-3, AC-6)", () 
     expect(res.isError).toBeFalsy();
     const validate = ajv.getSchema("arch-mind/concept.schema.json")!;
     expect(validate(res.structuredContent), JSON.stringify(validate.errors)).toBe(true);
-    const stored = (await loadConcepts(store)).concepts.find((c) => c.id === "https");
+    const stored = ((await loadConcept(store, "https")) as { concept: unknown }).concept;
     expect(res.structuredContent).toEqual(JSON.parse(JSON.stringify(stored)));
 
     const missing = await call("get_concept", { id: "ghost" });

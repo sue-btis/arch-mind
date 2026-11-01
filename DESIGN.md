@@ -1,6 +1,6 @@
 ---
 name: arch-mind
-description: A personal architecture study tool whose diagrams read like a wiring harness inside a calm, Apple-like neutral interface.
+description: A personal architecture study tool whose diagrams read like a wiring harness laid out on stacked layer plates, inside a calm, Apple-like neutral interface.
 colors:
   gray-0: "#ffffff"
   gray-1: "#f5f5f7"
@@ -55,10 +55,21 @@ typography:
     fontSize: "11px"
     fontWeight: 600
     fontFeature: "tnum"
+  plate-label:
+    fontFamily: "Inter Variable, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "13px"
+    fontWeight: 600
+    letterSpacing: "0.08em"
+  board-label:
+    fontFamily: "Inter Variable, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "13px"
+    fontWeight: 400
+    lineHeight: "16px"
   wire-label:
     fontFamily: "Inter Variable, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "11px"
+    fontSize: "13px"
     fontWeight: 400
+    lineHeight: "16px"
 rounded:
   board: "0px"
   control: "8px"
@@ -93,6 +104,12 @@ components:
     textColor: "{colors.gray-0}"
     rounded: "{rounded.control}"
     padding: "4px 12px"
+  zoom-button:
+    backgroundColor: "transparent"
+    textColor: "{colors.gray-9}"
+    rounded: "{rounded.control}"
+    height: "28px"
+    width: "28px"
   sidebar:
     backgroundColor: "{colors.gray-0}"
     rounded: "{rounded.panel}"
@@ -108,13 +125,15 @@ components:
     rounded: "{rounded.floating}"
     padding: "12px"
     width: "320px"
-  connector:
+  fit-message:
     backgroundColor: "{colors.gray-0}"
     typography: "{typography.body}"
+    rounded: "{rounded.floating}"
+    padding: "16px"
+  concept-object:
+    typography: "{typography.board-label}"
     rounded: "{rounded.board}"
-    padding: "0 10px"
-    width: "176px"
-    height: "48px"
+    size: "44px"
   matrix-cell:
     rounded: "{rounded.board}"
     size: "32px"
@@ -126,51 +145,53 @@ components:
 
 **Creative North Star: "The Wiring Harness"**
 
-**The Harness Thesis.** Every diagram is a wiring harness board: concepts are connectors, relations are wires whose color code names the relation type, and the four layers (client, network, server, data) are harness zones stacked top to bottom. Around the board sits a quiet, Apple-like neutral interface that never competes with it.
+**The Harness Thesis.** Every diagram is a wiring harness: concepts are connectors, drawn as small isometric objects standing on the board, relations are wires whose color code names the relation type, and the four layers (client, network, server, data) are tinted plates stacked top to bottom. Around the board sits a quiet, Apple-like neutral interface that never competes with it.
 
-Two languages share each screen on purpose. The interface is soft: rounded panels and controls, generous spacing, neutrals from one gray ramp. The board is exact: square connector blocks, 1px hairlines, orthogonal wires with a label on every one. The contrast is the identity, not an accident.
+Two languages share each screen on purpose. The interface is soft: rounded panels and controls, generous spacing, neutrals from one gray ramp. The board is exact: flat plates in one fixed projection, pictograms drawn on one isometric grid with 1px outlines, wires laid out by elk with a label on every one. The contrast is the identity, not an accident.
 
-Motion explains what changed. When a filter changes, the connectors glide to their new places while the wires, whose routes were recomputed, step aside and come back once the connectors have settled. Sheets, popovers and revealed answers enter briefly and never bounce. All motion uses one ease-out curve; there is no spring. Under reduced motion the glide is dropped and every entrance becomes a plain fade.
+Motion explains what changed. When a filter changes, the concepts glide to their new places while the wires, whose routes were recomputed, step aside and come back once the concepts have settled. Sheets, popovers and revealed answers enter briefly and never bounce. All motion uses one ease-out curve; there is no spring. Under reduced motion the glide is dropped and every entrance becomes a plain fade.
 
 The interface runs in light and dark mode with equal care; neither is the default. The mode follows the operating system (`prefers-color-scheme`); there is no in-app toggle.
 
 **Key Characteristics:**
 - One 11-step gray ramp, remapped by role for dark mode; no other grays.
 - Near-black ink as the only action color in light mode, near-white in dark mode.
-- Meaningful color only inside the board: layer keys on zones and designators, three wire hues.
+- Meaningful color only inside the board: layer keys on plates, pictogram faces and designators, three wire hues.
 - Inter only; tabular figures only where numbers are compared.
-- Rounded interface, square board; one soft shadow for floating layers, a flat board.
-- Deferred by the author's decision, not built: chain tracing, the trace pulse, the pin table and splice dots.
+- Rounded interface, sharp-cornered board; one soft shadow for floating layers, flat plates.
+- The plates shrink to fit down to a floor of 0.85 and are refused below it; zoom moves only in fixed steps of Fit.
+- Deferred by the author's decision, not built: bringing a selected concept's neighbourhood forward (M06), concept illustrations (M07), chain tracing, the trace pulse, the pin table and splice dots.
 
 ## Colors
 
 A neutral interface from one gray ramp, with hue reserved for the board and for correction.
 
 ### Primary
-- **Ink Action** (`{colors.gray-9}` in light, `{colors.gray-1}` in dark): the single action color. It fills the primary button and the active view segment, draws the 2px focus ring (offset 2px) and tints checkboxes. It is the same value as body text; pressability is carried by the filled shape, not by a hue.
+- **Ink Action** (`{colors.gray-9}` in light, `{colors.gray-1}` in dark): the single action color. It fills the primary button and the active view segment, draws the 2px focus ring (offset 2px) and the focus ellipse on the board, and tints checkboxes. It is the same value as body text; pressability is carried by the filled shape, not by a hue.
 
 ### Secondary
 - **Correction Red** (`{colors.correction-red}` / `{colors.correction-red-dark}`): only for load errors, failed requests and a review answer marked wrong. Never decorative, never a hover state.
 
 ### Tertiary
-- **Layer Keys** (`{colors.layer-client}`, `{colors.layer-network}`, `{colors.layer-server}`, `{colors.layer-data}` and their `-dark` mirrors): client blue, network teal, server amber-brown, data violet. They color the zone name, the zone tint (the key mixed at 7% into transparent), the connector border and the connector designator, and the designators in the matrix headers.
+- **Layer Keys** (`{colors.layer-client}`, `{colors.layer-network}`, `{colors.layer-server}`, `{colors.layer-data}` and their `-dark` mirrors): client blue, network teal, server amber-brown, data violet. They color the plate (face at 7% opacity, edge at 55% opacity), the plate name, the three shaded faces of every pictogram on that plate, the concept designator, and the designators in the matrix headers.
 - **Wire Code** (`{colors.wire-requires}`, `{colors.wire-complements}`, `{colors.wire-contains}` and their `-dark` mirrors): magenta for `requires`, green for `complements`, olive-gold for `contains`. Only these three exact core verbs (matched after trimming, lowercasing and collapsing spaces) get a hue. Each carries a short code: `rq`, `cp`, `ct`.
 - **Graphite Wire** (`{colors.gray-7}` in light, `{colors.gray-4}` in dark): every other free-text relation type. `alternative to` is drawn in graphite dashed (5 on, 4 off) with the code `alt`, because an alternative is not a dependency and does not earn a fourth hue.
 
 ### Neutral
 - **Canvas** (`{colors.gray-1}` light / `{colors.gray-10}` dark): page background behind panels and the board.
-- **Panel and Board** (`{colors.gray-0}` light / `{colors.gray-9}` dark): sidebar, sheet, popover, review card and the board surface; also the wire-label background.
-- **Hairline** (`{colors.gray-3}` light / `{colors.gray-7}` dark): every 1px border, zone edge and matrix grid line.
-- **Ink** (`{colors.gray-9}` light / `{colors.gray-1}` dark): body text.
-- **Muted Ink** (`{colors.gray-6}` light / `{colors.gray-4}` dark): secondary text, section labels, counts, inactive view segments.
+- **Panel and Board** (`{colors.gray-0}` light / `{colors.gray-9}` dark): sidebar, sheet, popover, review card and the board surface; also the wire-chip fill and the halo behind concept labels.
+- **Hairline** (`{colors.gray-3}` light / `{colors.gray-7}` dark): every 1px interface border and matrix grid line.
+- **Ink** (`{colors.gray-9}` light / `{colors.gray-1}` dark): body text, concept labels and wire labels.
+- **Muted Ink** (`{colors.gray-6}` light / `{colors.gray-4}` dark): secondary text, section labels, counts (including a plate's "shown" count), "no concepts shown", inactive view segments, the zoom value.
+- **Pictogram Outline** (`{colors.gray-9}` light / `{colors.gray-10}` dark): the 1px outline and dark details of every pictogram.
 - **Scrollbar** (`{colors.gray-4}`): the only use of step 4 in light mode.
 
 ### Named Rules
 **The Quarantine Rule.** Meaningful color lives only inside the board. Everything outside it is neutral, plus the ink action color for what can be pressed and correction red for what went wrong. The one deliberate exception, chosen by the author, is the sidebar wire legend: its swatches repeat the wire code so the code can be read without hovering a wire. No other color leaves the board.
 
-**The Double Carrier Rule.** No meaning rides on color alone. Every wire keeps its free-text label, every coded matrix swatch shows its letter code, every zone shows its name, every designator spells its layer initial.
+**The Double Carrier Rule.** No meaning rides on color alone. Every wire keeps its free-text label, every coded matrix swatch shows its letter code, every plate shows its name, every designator spells its layer initial, and every pictogram's meaning is written out in its tooltip and in the concept list.
 
-Measured contrast, both modes: text at or above 4.66:1, focus ring at or above 15:1, wires on tinted zones at or above 4.45:1, matrix swatch codes at or above 4.92:1.
+Measured contrast for the plates, both modes: all text at or above 4.5:1; the tightest pair is muted ink on the light plate tint at 4.59:1. Matrix swatch codes measured earlier at or above 4.92:1 (the matrix is unchanged). Wire strokes and the focus ellipse on plate tints have not been re-measured since the plates replaced the zones.
 
 ## Typography
 
@@ -182,43 +203,54 @@ Measured contrast, both modes: text at or above 4.66:1, focus ring at or above 1
 ### Hierarchy
 - **Title** (600, 17px, tracking -0.025em): sheet and review headings.
 - **Headline** (600 or 500, 15px): the product name in the header (600, tight tracking) and the current review question (500).
-- **Body** (400, 13px, line-height 1.5): all interface text, connector titles (tight leading, clamped to two lines), popover and sheet content. Emphasis inside body uses 500 or 600, never a size change.
-- **Label** (600, 11px, tracking 0.1em, uppercase): section headings in the sidebar, sheet and review, and zone names on the board (zone names take their layer key color).
-- **Designator** (600, 11px, tabular figures): connector and matrix designators such as C1, N3, colored by layer key.
-- **Wire Label** (400, 11px): relation type on every wire, on a board-colored chip padded 4px by 2px.
+- **Body** (400, 13px, line-height 1.5): all interface text, popover, sheet, fit message and concept list. Emphasis inside body uses 500 or 600, never a size change.
+- **Label** (600, 11px, tracking 0.1em, uppercase): section headings in the sidebar, sheet and review.
+- **Designator** (600, 11px, tabular figures): matrix designators such as C1, N3, colored by layer key.
+- **Plate Label** (600, 13px, tracking 0.08em, uppercase, layer key): the plate name centered beneath its layer pictogram, followed by the shown count in muted 400 tabular figures with no tracking.
+- **Board Label** (400, 13px, 16px lines): the concept label under each pictogram, up to two lines (about 18 characters each, the first line shortened by the designator) with an ellipsis past that. The designator leads the first line in 600 tabular figures in the layer key. A 4px halo in the board color, painted under the text, keeps labels legible where they cross a wire or a plate edge.
+- **Wire Label** (400, 13px, 16px lines): relation type on every wire, up to two lines of about 16 characters (no narrower wrap), on a sharp-cornered board-colored chip padded 4px by 2px, set inline on its wire.
 
 ### Named Rules
 **The One Face Rule.** Inter carries the whole product, interface and board alike. Hierarchy comes from size and weight, never from a second family.
 
-**The Tabular Figures Rule.** Tabular figures apply only where numbers are compared: designators, counts (concepts, relations, shown, board use, due, question position, box) and dates. Prose stays proportional.
+**The Tabular Figures Rule.** Tabular figures apply only where numbers are compared: designators, counts (concepts, relations, shown, board use, zoom, due, question position, box) and dates. Prose stays proportional.
+
+**The 13 Pixel Board Rule.** Board text is set at 13px at a Fit scale of 1 so it stays at or above 11px on screen at the 0.85 floor. Text on the board is never sheared or squashed by the plate projection; only its anchor point is projected.
 
 ## Layout
 
 The study screen is centered at a maximum of 1366px with 16px outer padding and 12px gaps. A header line carries the product name left and the corpus counts right. Below, a 200px rounded sidebar on the left holds facet filters (layers, domains, concerns), a clear-filters button when any filter is set, the wire legend, and unreadable files when there are any. The board fills the rest of the width under a view switch (Layers, Matrix, Review) and a live line of shown counts and board use.
 
-Zones stack vertically so the board grows downward, never sideways. A view whose natural width exceeds the board does not scroll and does not scale: it is replaced by a fit message stating the needed and available widths and asking for narrower filters. The concept detail is a 420px sheet fixed to the right edge, 16px from the window, floating over the board; there is no permanent right column.
+In the Layers view, a zoom group sits top-right inside the board (zoom out, the current percentage, zoom in, Fit), the plates fill the board below it, and a collapsed "Concepts and relations" list closes the board under a hairline. The plates grow downward, never sideways. The concept detail is a 420px sheet fixed to the right edge, 16px from the window, floating over the board; there is no permanent right column.
+
+**The Fit Floor Rule.** The plates are drawn at the Fit scale, min(1, board width / projected width), so they never scroll sideways. Below 0.85, the scale at which 13px labels fall under 11px or 44px pictograms under 32px, the view is refused and replaced by the fit message, which states the scale it would need, the board width and the floor, and asks for narrower filters. The matrix cannot shrink: it is refused by width, stating the needed and available pixels.
+
+Zoom moves only in four steps of Fit: 1, 1.5, 2 and 3 times. At Fit there is no panning; zoomed in, the view pans by dragging the empty board, and its centre is clamped so the plates never show empty space around them. Keyboard focus moving to a concept off screen shifts the view just enough to bring it in.
 
 Spacing comes from a 4px step: 4, 8, 12, 16, 20, 24. Sidebar groups sit 20px apart; panels pad 16px, the review card 24px.
 
-**The Board Grid Rule.** Inside the board nothing is placed by hand. elk's layered algorithm lays connectors out top to bottom, partitioned by layer, with fixed measures (24px between connectors, 64px between ranks, 16px board margin). Every connector has the same footprint and every wire runs only horizontally and vertically. Zones hug their connectors (30px above, 14px below, 12px between zones); a layer with nothing shown keeps a 28px zone reading "no concepts shown", and everything below shifts down by whole zones so wires stay orthogonal. Wire labels are placed along the longest segments first, at the first spot that clears every connector, the wire's own bends and every label already placed. There is no snapping lattice beyond these measures.
+**The Board Grid Rule.** Inside the board nothing is placed by hand and nothing is routed by the board. All shown concepts go into one elk layered graph, top to bottom, partitioned by layer so each layer keeps its own band of ranks; elk places every cell and computes every orthogonal route and every label position, within a plate and between plates, and the board only projects that plane onto the plates. A concept takes a fixed cell of 190 by 208 plate units (its 79px screen height divided by the 0.38 squash), its pictogram's ground point at 46% of the cell height from the top; cells sit 24 apart within and between ranks, and wires keep 14 from each other and from cells (28 between ranks). Each layer also has a mark cell of the same size carrying its pictogram and caption, placed by elk like a concept, so no wire crosses it. A layer's band runs from its first to its last cell, padded by up to 28 units without reaching the next band. A band point (u along, v down from the band's top) is projected onto its plate at x = u − 0.25v and y = plate offset + 0.38v; the gap between two bands maps linearly onto the screen gap between their plates (24px plus the gap squashed), so plate spacing follows the routing room elk needed and a wire between plates stays one continuous line that bends only where the mapping does. Wires leave a concept at the bottom border of its cell and enter the target at the top border; jogs under 9px left by the squash are dropped, and the arrowhead follows the last segment, slanted or not. Each wire carries an elk label sized as its chip and set inline on the wire; the chip is drawn upright at the projected centre of elk's label box. For every layer filter the scene checks require that no wire crosses a concept or a mark that is not one of its ends, no two wires share a line, every label is nearer its own wire than any other, and no segment is under 8px.
 
 The matrix is a fixed grid: a 220px row header, 32px square cells, 160px column headers with vertical titles, ordered client, network, server, data.
 
 ## Elevation & Depth
 
-The board is flat: no shadows, no cards, depth only from hairlines and the 7% zone tints. The interface has one level of elevation, used only by layers that float above the board.
+Depth on the board comes from the projection: plates are flat faces sheared into a fixed oblique view and stacked top to bottom, and each pictogram is a small isometric solid whose three faces are shaded from its layer key. The interface has one level of elevation, used only by layers that float above the board.
 
 ### Shadow Vocabulary
-- **Floating** (`box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)`): the concept sheet and the relation popover. Resting panels (sidebar, review card, view switch) carry a hairline and no shadow.
+- **Floating** (`box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)`): the concept sheet and the relation popover. Resting panels (sidebar, review card, view switch, fit message) carry a hairline and no shadow.
+- **Ground** (a flat ellipse, 38 by 19 units at the pictogram's foot, black at 8% in light and 45% in dark): the only shadow on the board. It seats each pictogram on its plate.
 
 ### Named Rules
-**The Flat Board Rule.** Nothing inside the board casts a shadow. A connector stands out by its layer-colored hairline, not by lift.
+**The Flat Plate Rule.** Plates have no thickness, no shadow and no gradient: a 7% layer tint and a 55% layer-colored edge. The only shadow on the board is each pictogram's own flat ground ellipse; nothing on the board is blurred, lifted or given a drop shadow. A concept stands out by its shaded faces and outline, not by lift.
 
 ## Shapes
 
-**The Soft Frame, Hard Board Rule.** Interface panels, controls and inputs use rounded corners: 16px for resting panels (sidebar, sheet, review card), 12px for floating and grouping elements (popover, view switch, fit message), 8px for buttons and view segments. The board frame, connectors, zones, wires, matrix cells and swatches use square corners and 1px lines. A rounded connector or a square button breaks the rule.
+**The Soft Frame, Hard Board Rule.** Interface panels, controls and inputs use rounded corners: 16px for resting panels (sidebar, sheet, review card), 12px for floating and grouping elements (popover, view switch, fit message), 8px for buttons, view segments and zoom buttons. Plates, wires, matrix cells and swatches use sharp corners and 1px lines. A rounded plate or a square button breaks the rule.
 
-Wires end in a closed arrowhead (14px) in the wire's own color. Hover or keyboard focus thickens a wire from 1px to 2.5px.
+Plates are parallelograms: rectangles sheared by 0.25 and squashed to 0.38 of their depth. Wires end in a closed arrowhead (9px) in the wire's own color, oriented along the last segment. Hover or keyboard focus thickens a wire from 1px to 2.5px.
+
+**The Isometric Grid Rule.** Every pictogram is drawn on one 48-unit grid, shown at 44px, standing on a ground point at (24, 40). Solids use 2:1 isometric faces (slope 0.5); cylinders use ellipses at a 2:1 ratio. Each solid shows a top, a left and a right face, filled from the layer key: in light mode the key mixed at 16%, 45% and 80% into white; in dark mode at 80% into white for the top and 72% and 42% into black for the left and right. Outlines and detail lines are 1px (emphasized strokes 1.75px) in the pictogram outline color, with round joins, and never scale with zoom. Pictograms are never sheared with the plate.
 
 ## Components
 
@@ -232,19 +264,28 @@ Wires end in a closed arrowhead (14px) in the wire's own color. Hover or keyboar
 ### View Switch
 - **Style:** a 12px-rounded hairline group on panel, 4px inner padding. The active segment is ink-filled with inverse text (8px radius); inactive segments are muted text that turns ink on hover. State is exposed with `aria-pressed`.
 
+### Zoom Group
+- **Style:** 28px hairline buttons with 8px radius and 13px text (zoom out, zoom in, Fit), canvas fill on hover, muted text when disabled at either end of the steps. Between them the current on-screen scale (Fit scale times zoom step) in muted 13px tabular figures, such as "96 %".
+
 ### Sidebar
 - **Style:** 200px, 16px radius, hairline border, panel fill, 16px padding. Groups are fieldsets with an uppercase label heading and native checkboxes tinted with the action color.
 - **Wire legend:** a 20px line sample per code at 2px stroke, the letter code in muted label weight, then the type name; the last row is graphite "any other type" in muted ink.
 - **Problems:** file name in 500 weight, reason in muted ink, shown only when files failed to parse.
 
-### Connector (signature)
-A square-cornered 176 x 48px block on the board color with a 1px border in its layer key. A layer-colored tabular designator sits left of the title; the title wraps to at most two lines and shows the full text on hover. The whole block is a button that opens the concept sheet.
+### Plate (signature)
+A flat parallelogram per layer, tinted with its key at 7% and edged in the key at 55%. Its layer pictogram stands in the mark cell elk placed for it, with the plate label centered beneath it ("CLIENT 6 shown"). An empty plate is as deep as its mark cell and sets muted "no concepts shown" at three quarters of its width, halfway down. Each plate is exposed as an image whose name gives the layer, the shown count and the pictogram's meaning.
 
-### Zone (signature)
-A full-width band with hairlines top and bottom and the layer key mixed at 7% as fill. The uppercase layer name sits top-left in the key color; an empty zone centers the name with muted "no concepts shown" beside it.
+### Concept Object (signature)
+A 44px isometric pictogram from the catalog standing on its plate, with its ground shadow, and a two-line board label below it in screen space: the designator in the layer key, then the title. A concept whose pictogram is missing or not in the catalog falls back to its layer's pictogram. The tooltip reads designator, title and the pictogram's meaning. The whole object is a button that opens the concept sheet with click, Enter or Space. Keyboard focus draws a 2px ink ellipse (64 by 32px) around the foot; hover draws the same ellipse at 1px.
 
 ### Wire (signature)
-An elk-routed orthogonal path at 1px in its wire code, with a closed arrowhead and an 11px label on a board-colored chip. The label is always kept, even on coded wires. A 14px invisible stroke widens the hit area. Hover or focus previews the relation popover; click, Enter or Space pins it.
+A 1px path in its wire code with a closed 9px arrowhead and a 13px label on a board-colored chip set on the wire where elk placed the label; chips are drawn above the concepts. The label is always kept, even on coded wires. A 14px invisible stroke widens the hit area. Hover or focus previews the relation popover; click, Enter or Space pins it. Keyboard focus also shows the hit stroke in ink at 18%.
+
+### Concept List
+A native disclosure under the plates, closed by default: "Concepts and relations (N concepts, M relations)" in 500. Open, it lists every concept by layer as an underlined button (hairline underline turning ink on hover) that opens the sheet, followed in muted ink by its layer and pictogram meaning, with its outgoing relations nested beneath. It carries everything the plates show, as text, for keyboard and screen reader use.
+
+### Fit Message
+A 12px-rounded hairline panel with 16px padding and 13px text, announced as a status, that replaces a view which cannot be drawn readably. For the plates it gives the scale needed, the board width and the 85% floor; for the matrix the needed and available widths. Both end by asking for fewer layers, domains or concerns.
 
 ### Matrix Swatch
 A square swatch 16px high and at least 24px wide, centered in its cell. A single coded relation fills it with the wire color and shows its letter code in the board color; `alternative to` is a dashed graphite outline with the code in ink; a single uncoded relation is a plain graphite fill; several relations show their count.
@@ -253,14 +294,14 @@ A square swatch 16px high and at least 24px wide, centered in its cell. A single
 A 320px tooltip, 12px radius, hairline, floating shadow. It shows the type with from and to, the source and the explanation; several relations stack with hairline separators. It opens below its anchor and flips above when the window would cut it off.
 
 ### Concept Sheet
-A 420px non-modal dialog fixed to the right edge, 16px radius, floating shadow, scrolling internally. It shows the metadata as a two-column definition list, then labeled sections for SEE-I, relations, episodes and recall questions. Escape closes it and focus returns to the connector or row that opened it.
+A 420px non-modal dialog fixed to the right edge, 16px radius, floating shadow, scrolling internally. It shows the metadata as a two-column definition list, then labeled sections for SEE-I, relations, episodes and recall questions. Escape closes it and focus returns to the concept, list row or matrix row that opened it.
 
 ### Review Card
 A centered card of up to 672px, 16px radius, 24px padding. It shows the question in headline weight; the revealed answer repeats the sheet's SEE-I and relation sections. A wrong mark is the one place correction red appears in a normal flow.
 
 ### Motion
-- **Re-place on filter change:** connectors glide to their new positions over 320ms on `cubic-bezier(0.16, 1, 0.3, 1)`. Wires fade out over 80ms (linear) during the settle and return over 180ms on the same curve.
-- **Entrances:** new connectors fade in over 220ms; the sheet slides 12px in from the right with a fade over 260ms; the popover fades over 120ms; a revealed answer unclips top to bottom over 240ms. All use backwards fill so nothing flashes before it starts.
+- **Re-place on filter change:** concepts glide to their new positions over 320ms on `cubic-bezier(0.16, 1, 0.3, 1)`. Wires and their chips fade out over 80ms (linear) during the settle and return over 180ms on the same curve.
+- **Entrances:** new concepts fade in over 220ms; the sheet slides 12px in from the right with a fade over 260ms; the popover fades over 120ms; a revealed answer unclips top to bottom over 240ms. All use backwards fill so nothing flashes before it starts.
 - **Reduced motion:** no glide and no wire hiding; the sheet and the answer reveal become plain fades.
 
 ## Do's and Don'ts
@@ -271,13 +312,15 @@ A centered card of up to 672px, 16px radius, 24px padding. It shows the question
 - **Do** use the single ease-out curve (`cubic-bezier(0.16, 1, 0.3, 1)`) for all motion, with backwards fill on entrances.
 - **Do** design light and dark together, remapping roles onto the same gray ramp.
 - **Do** keep a label on every wire, including coded ones.
-- **Do** replace a view that would not fit with the fit message instead of scrolling or scaling it.
+- **Do** draw the plates at the Fit scale and replace them with the fit message below 0.85; replace the matrix with the fit message when it is wider than the board. Neither view scrolls sideways.
+- **Do** draw a new pictogram on the 48-unit isometric grid with three key-shaded faces, a 1px outline and the ground ellipse at (24, 40), and add it to the catalog with a one-line meaning.
 - **Do** check every new color pair for WCAG 2.2 AA in both modes.
 
 ### Don't:
-- **Don't** make the board look like draw.io, Mermaid or a free-floating node graph: no dragging, panning or zooming.
+- **Don't** make the board look like draw.io, Mermaid or a free-floating node graph: no dragging concepts, no free zoom (only 1, 1.5, 2 and 3 times Fit), no panning at Fit.
 - **Don't** make the interface look like a generic SaaS dashboard of cards and charts.
 - **Don't** let color be the only carrier of meaning.
 - **Don't** give a free-text relation type its own hue; only `requires`, `complements` and `contains` are coded.
-- **Don't** round a board element or put a shadow on one.
+- **Don't** round a plate, wire or matrix cell, and don't give anything on the board a shadow other than a pictogram's ground ellipse.
+- **Don't** shear or squash text or pictograms with the plate; only their anchor points are projected.
 - **Don't** introduce a second font family or a gray outside the ramp.
