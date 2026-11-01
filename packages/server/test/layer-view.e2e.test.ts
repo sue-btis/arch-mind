@@ -48,7 +48,7 @@ describe.each(["light", "dark"] as const)("layer view at 1366 x 768, %s mode (TS
           innerWidth: window.innerWidth,
           scrollWidth: root.scrollWidth,
           clientWidth: root.clientWidth,
-          zoom: board.getAttribute("data-zoom"),
+          fitMessages: document.querySelectorAll('[data-testid="fit-message"]').length,
           boardRight: rect(board).right,
           connectors: document.querySelectorAll(".react-flow__node-connector").length,
           edges: document.querySelectorAll(".react-flow__edge").length,
@@ -58,11 +58,11 @@ describe.each(["light", "dark"] as const)("layer view at 1366 x 768, %s mode (TS
           fonts: getComputedStyle(document.body).fontFamily,
         };
       });
-      console.log(`${scheme}: scrollWidth=${m.scrollWidth} clientWidth=${m.clientWidth} innerWidth=${m.innerWidth} zoom=${m.zoom}`);
+      console.log(`${scheme}: scrollWidth=${m.scrollWidth} clientWidth=${m.clientWidth} innerWidth=${m.innerWidth} boardRight=${m.boardRight}`);
 
       expect(m.scrollWidth).toBeLessThanOrEqual(1366);
       expect(m.scrollWidth).toBeLessThanOrEqual(m.clientWidth);
-      expect(m.zoom).toBe("1");
+      expect(m.fitMessages).toBe(0);
       expect(Math.max(...m.nodeRights)).toBeLessThanOrEqual(m.boardRight);
       expect(m.connectors).toBe(13);
       expect(m.edges).toBe(tst032RelationCount);

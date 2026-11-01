@@ -66,3 +66,17 @@ export interface FileProblem {
   file: string;
   reason: string;
 }
+
+export interface ReviewLine {
+  question: string;
+  at: string;
+  result: "right" | "wrong";
+}
+
+export interface QuestionState {
+  question: string;
+  conceptId: string;
+  text: string;
+  box: number;
+  due: string;
+}

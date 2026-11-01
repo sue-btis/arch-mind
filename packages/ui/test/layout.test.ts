@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { LAYERS, type Concept } from "@arch-mind/rules/model";
-import { tst032Concepts, tst032RelationCount } from "@arch-mind/rules/fixtures";
+import { overWideConcepts, tst032Concepts, tst032RelationCount } from "@arch-mind/rules/fixtures";
 import { layoutConcepts } from "../src/layout.ts";
 
 const MAX_WIDTH = 1366;
@@ -54,5 +54,18 @@ describe("layer view layout (TST-008 geometry, AC-7, AC-8)", () => {
     const out = await layoutConcepts(tst032Concepts);
     expect(out.nodes.filter((n) => n.layer === "client").map((n) => n.designator).sort()).toEqual(["C1", "C2", "C3", "C4", "C5", "C6"]);
     expect(out.nodes.find((n) => n.layer === "server" && n.designator === "S1")).toBeDefined();
+  });
+
+  it("carries each relation's source and explanation on its edge", async () => {
+    const out = await layoutConcepts(tst032Concepts);
+    const edge = out.edges.find((e) => e.source === "host-prefix" && e.target === "secure-attr")!;
+    expect(edge.label).toBe("requires");
+    expect(edge.citation).toContain("rfc6265bis");
+    expect(edge.explanation).toContain("Secure attribute");
+  });
+
+  it("TST-014: the over-wide fixture lays out wider than the 1366 px reference screen", async () => {
+    const out = await layoutConcepts(overWideConcepts);
+    expect(out.width).toBeGreaterThan(MAX_WIDTH);
   });
 });
