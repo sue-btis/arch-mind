@@ -6,8 +6,8 @@ interface Detail {
   questions: QuestionState[];
 }
 
-const SEE_I_LABELS = { statement: "State", elaboration: "Elaborate", example: "Exemplify", illustration: "Illustrate" } as const;
-const SECTION_TITLE = "mb-1.5 text-[11px] font-semibold uppercase tracking-widest text-ink-muted";
+export const SEE_I_LABELS = { statement: "State", elaboration: "Elaborate", example: "Exemplify", illustration: "Illustrate" } as const;
+export const SECTION_TITLE = "mb-1.5 text-[11px] font-semibold uppercase tracking-widest text-ink-muted";
 
 export function ConceptDetail({ id, titles, onClose }: { id: string; titles: Map<string, string>; onClose: () => void }) {
   const [detail, setDetail] = useState<Detail | null>(null);

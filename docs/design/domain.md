@@ -60,12 +60,14 @@
 - Identity: stable within its concept, so review history keeps pointing at it when its text is edited.
 - Lifecycle: proposed → confirmed → in box 1, due the day after capture → moves between boxes with each review (FR-028 to FR-030).
 - Invariants: exactly one box and one due date at any time (BR-006); both follow from its confirmation day, its review history and the box intervals. The confirmation day is recorded when the author confirms the question and never changes.
+- Day rule: a day is a calendar day in the author's local time zone, for the confirmation day, the day of each review and every due date. A question is due when its due date is today or earlier, so a question left unreviewed stays due until answered.
 
 ### Review
 - Meaning: a fact that the author answered a question on a day, right or wrong.
 - Identity: the question plus the moment it was recorded.
 - Lifecycle: recorded once; never edited or removed (BR-007).
 - Invariants: refers to an existing recall question; its result is right or wrong.
+- Day: counts for the local calendar day of the moment it was recorded; the next due date is counted from that day.
 
 ### Facet catalog
 - Meaning: the allowed values for each facet.

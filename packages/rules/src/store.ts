@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { access, link, mkdir, open, readFile, readdir, rename, unlink, writeFile } from "node:fs/promises";
+import { access, link, mkdir, open, readFile, readdir, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
@@ -108,14 +108,46 @@ async function conceptFileNames(storePath: string): Promise<string[]> {
   }
 }
 
+interface CachedConcept {
+  mtimeMs: number;
+  size: number;
+  concept: Promise<Concept>;
+}
+
+// Per store path and file name; an entry is trusted only while the file's mtime and size are unchanged.
+// The promise is stored while parsing so concurrent loads share one parse; a failure removes the entry,
+// so a file that does not parse is re-read and reported on every load.
+const parsedConcepts = new Map<string, Map<string, CachedConcept>>();
+
+async function readConceptFile(storePath: string, name: string): Promise<Concept> {
+  const file = join(storePath, "concepts", name);
+  const cache = parsedConcepts.get(storePath) ?? new Map<string, CachedConcept>();
+  parsedConcepts.set(storePath, cache);
+  const { mtimeMs, size } = await stat(file);
+  const hit = cache.get(name);
+  if (hit && hit.mtimeMs === mtimeMs && hit.size === size) return structuredClone(await hit.concept);
+  const parsing = readFile(file, "utf8").then((text) => {
+    const concept = parseConcept(text);
+    if (`${concept.id}.md` !== name) throw new Error(`id "${concept.id}" does not match the file name`);
+    return concept;
+  });
+  const entry = { mtimeMs, size, concept: parsing };
+  cache.set(name, entry);
+  parsing.catch(() => {
+    if (cache.get(name) === entry) cache.delete(name);
+  });
+  return structuredClone(await parsing);
+}
+
 export async function loadConcepts(storePath: string): Promise<{ concepts: Concept[]; problems: FileProblem[] }> {
   const concepts: Concept[] = [];
   const problems: FileProblem[] = [];
-  for (const name of await conceptFileNames(storePath)) {
+  const names = await conceptFileNames(storePath);
+  const cache = parsedConcepts.get(storePath);
+  for (const cached of cache?.keys() ?? []) if (!names.includes(cached)) cache!.delete(cached);
+  for (const name of names) {
     try {
-      const concept = parseConcept(await readFile(join(storePath, "concepts", name), "utf8"));
-      if (`${concept.id}.md` !== name) throw new Error(`id "${concept.id}" does not match the file name`);
-      concepts.push(concept);
+      concepts.push(await readConceptFile(storePath, name));
     } catch (error) {
       problems.push({ file: name, reason: (error as Error).message });
     }
@@ -245,19 +277,12 @@ export async function loadConcept(storePath: string, id: unknown): Promise<LoadO
     errors: [{ path: "/id", rule: "unknown_concept", message }],
   });
   const file = `${id}.md`;
-  let text: string;
   try {
-    text = await readFile(join(storePath, "concepts", file), "utf8");
+    return { ok: true, concept: await readConceptFile(storePath, file) };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return unknown(`no stored concept "${id}"`);
-    throw error;
-  }
-  try {
-    const concept = parseConcept(text);
-    if (concept.id !== id) throw new Error(`id "${concept.id}" does not match the file name`);
-    return { ok: true, concept };
-  } catch (error) {
-    return unknown(`${file} cannot be read: ${(error as Error).message}`);
+    if (!(error instanceof Error) || (error as NodeJS.ErrnoException).code !== undefined) throw error;
+    return unknown(`${file} cannot be read: ${error.message}`);
   }
 }
 

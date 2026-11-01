@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { extname, join, normalize, sep } from "node:path";
-import { LAYERS, loadConceptDetail, loadConcepts, loadFacets } from "@arch-mind/rules";
+import { LAYERS, loadConceptDetail, loadConcepts, loadDueQuestions, loadFacets, parseReviewRequest, recordReview } from "@arch-mind/rules";
 import { checkRequest } from "./guard.ts";
 
 export interface RunningServer {
@@ -26,6 +26,24 @@ function sendJson(res: ServerResponse, status: number, body: unknown) {
   res.end(JSON.stringify(body));
 }
 
+const MAX_BODY_BYTES = 16 * 1024;
+
+async function readJsonBody(req: IncomingMessage): Promise<{ ok: true; value: unknown } | { ok: false; message: string }> {
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of req as AsyncIterable<Buffer>) {
+    size += chunk.length;
+    if (size <= MAX_BODY_BYTES) chunks.push(chunk);
+  }
+  // Drain an oversized body instead of closing early, so the client gets the 400 rather than a reset connection.
+  if (size > MAX_BODY_BYTES) return { ok: false, message: `body is larger than ${MAX_BODY_BYTES} bytes` };
+  try {
+    return { ok: true, value: JSON.parse(Buffer.concat(chunks).toString("utf8")) };
+  } catch {
+    return { ok: false, message: "body is not valid JSON" };
+  }
+}
+
 async function sendStatic(res: ServerResponse, uiDir: string, urlPath: string) {
   const relative = normalize(decodeURIComponent(urlPath)).replace(/^[\\/]+/, "");
   let file = join(uiDir, relative || "index.html");
@@ -40,6 +58,8 @@ async function sendStatic(res: ServerResponse, uiDir: string, urlPath: string) {
 
 export async function startServer(options: { storePath: string; uiDir: string; port: number }): Promise<RunningServer> {
   const { storePath, uiDir } = options;
+  // Warm the parse cache so the first request after startup does not pay for every concept file; requests report any problem themselves.
+  loadConcepts(storePath).catch(() => undefined);
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     const port = (server.address() as AddressInfo).port;
     const verdict = checkRequest(req, port);
@@ -60,6 +80,20 @@ export async function startServer(options: { storePath: string; uiDir: string; p
         const detail = await loadConceptDetail(storePath, detailId);
         if (!detail.ok) return sendJson(res, 404, { error: detail.errors[0]!.message });
         return sendJson(res, 200, { concept: detail.concept, questions: detail.questions });
+      }
+      if (path === "/api/reviews/due") {
+        if (!readOnly) return sendJson(res, 405, { error: "Method not allowed" });
+        return sendJson(res, 200, await loadDueQuestions(storePath));
+      }
+      if (path === "/api/reviews") {
+        if (req.method !== "POST") return sendJson(res, 405, { error: "Method not allowed" });
+        const body = await readJsonBody(req);
+        if (!body.ok) return sendJson(res, 400, { error: body.message });
+        const parsed = parseReviewRequest(body.value);
+        if (!parsed.ok) return sendJson(res, 400, { error: parsed.message });
+        const outcome = await recordReview(storePath, parsed.request);
+        if (!outcome.ok) return sendJson(res, 404, { error: outcome.message });
+        return sendJson(res, 201, outcome.state);
       }
       if (path.startsWith("/api/")) return sendJson(res, 404, { error: "Not found" });
       if (!readOnly) return sendJson(res, 405, { error: "Method not allowed" });

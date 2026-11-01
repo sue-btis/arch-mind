@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Ajv2020 } from "ajv/dist/2020.js";
@@ -9,6 +9,12 @@ import { tst032Concepts } from "../fixtures/tst-032.ts";
 import {
   StoreError,
   addDays,
+  appendReviewLine,
+  loadDueQuestions,
+  localDate,
+  parseReviewRequest,
+  recordReview,
+  selectDue,
   loadConceptDetail,
   loadReviewLines,
   replayQuestionStates,
@@ -119,5 +125,151 @@ describe("reviews.jsonl loader and concept detail", () => {
     await writeConceptAtomic(store, concept);
     await writeFile(join(store, "reviews.jsonl"), "garbage\n");
     await expect(loadConceptDetail(store, "cookie")).rejects.toThrow(/line 1/);
+  });
+});
+
+describe("TST-016: scheduler replay with the intervals read from facets (BR-006)", () => {
+  it("uses whatever intervals it is given, not the seed ones", () => {
+    const intervals = [2, 5, 11];
+    expect(replayQuestionStates(concept, [], intervals)[0]).toMatchObject({ box: 1, due: "2026-10-31" });
+    expect(replayQuestionStates(concept, [line(1, "right")], intervals)[0]).toMatchObject({ box: 2, due: addDays("2026-11-01", 5) });
+    const lines = [1, 2, 3, 4].map((d) => line(d, "right"));
+    expect(replayQuestionStates(concept, lines, intervals)[0]).toMatchObject({ box: 3, due: addDays("2026-11-04", 11) });
+    expect(replayQuestionStates(concept, [...lines, line(5, "wrong")], intervals)[0]).toMatchObject({ box: 1, due: addDays("2026-11-05", 2) });
+  });
+
+  it("works with a single box", () => {
+    expect(replayQuestionStates(concept, [line(1, "right"), line(2, "right")], [4])[0]).toMatchObject({ box: 1, due: addDays("2026-11-02", 4) });
+  });
+});
+
+describe("due list, review request and recording", () => {
+  let dir: string;
+  let store: string;
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), "arch-mind-due-"));
+    store = await setupStore(join(dir, "store"), join(dir, "config.json"));
+  });
+  afterEach(() => rm(dir, { recursive: true, force: true }));
+
+  const state = (conceptId: string, q: string, due: string) => ({ question: `${conceptId}#${q}`, conceptId, text: "?", box: 1, due });
+
+  it("lists questions due on or before today by due date, concept id, then question number", () => {
+    const states = [
+      state("b", "q1", "2026-11-02"),
+      state("a", "q10", "2026-11-02"),
+      state("a", "q2", "2026-11-02"),
+      state("z", "q1", "2026-11-01"),
+      state("a", "q1", "2026-11-03"),
+      state("c", "q1", "2026-12-24"),
+    ];
+    expect(selectDue(states, "2026-11-03").map((s) => s.question)).toEqual(["z#q1", "a#q2", "a#q10", "b#q1", "a#q1"]);
+    expect(selectDue(states, "2026-11-02").map((s) => s.question)).toEqual(["z#q1", "a#q2", "a#q10", "b#q1"]);
+    expect(selectDue(states, "2026-10-31")).toEqual([]);
+  });
+
+  async function fixtureStore() {
+    const today = localDate();
+    await writeConceptAtomic(store, { ...concept, id: "dueconcept", recall: [{ id: "q1", question: "Due?", confirmed: addDays(today, -1) }] });
+    await writeConceptAtomic(store, { ...concept, id: "later", recall: [{ id: "q1", question: "Later?", confirmed: today }] });
+    return today;
+  }
+
+  async function snapshot(): Promise<string> {
+    const names = [...(await readdir(store)), ...(await readdir(join(store, "concepts"))).map((n) => `concepts/${n}`)].sort();
+    const entries = await Promise.all(names.map(async (n) => [n, (await readFile(join(store, n)).catch(() => null))?.toString()]));
+    return JSON.stringify(entries);
+  }
+
+  it("loads only what is due today and leaves every file byte-identical (box and due are never stored)", async () => {
+    const today = await fixtureStore();
+    const before = await snapshot();
+    const due = await loadDueQuestions(store);
+    expect(due.map((s) => s.question)).toEqual(["dueconcept#q1"]);
+    expect(due[0]).toMatchObject({ box: 1, due: today });
+    expect(await snapshot()).toBe(before);
+  });
+
+  it("validates the due list, a recorded state and request bodies against the openapi schemas", async () => {
+    await fixtureStore();
+    const docs = new URL("../../../docs/design/", import.meta.url);
+    const openapi = parseYaml(await readFile(new URL("api/openapi.yaml", docs), "utf8"));
+    const ajv = addFormats(new Ajv2020({ allErrors: true, strict: false }));
+    const validList = ajv.compile({ ...openapi.paths["/api/reviews/due"].get.responses["200"].content["application/json"].schema, components: openapi.components });
+    const validState = ajv.compile({ ...openapi.paths["/api/reviews"].post.responses["201"].content["application/json"].schema, components: openapi.components });
+    const validRequest = ajv.compile(openapi.paths["/api/reviews"].post.requestBody.content["application/json"].schema);
+
+    expect(validList(await loadDueQuestions(store)), JSON.stringify(validList.errors)).toBe(true);
+    const outcome = await recordReview(store, { question: "dueconcept#q1", result: "right" });
+    expect(outcome.ok).toBe(true);
+    if (outcome.ok) expect(validState(outcome.state), JSON.stringify(validState.errors)).toBe(true);
+    const bodies = [
+      { question: "a#q1", result: "right" },
+      { question: "A#q1", result: "right" },
+      { question: "a#q1", result: "maybe" },
+      { question: "a#q1" },
+      { question: "a#q1", result: "right", x: 1 },
+    ];
+    for (const body of bodies) expect(parseReviewRequest(body).ok, JSON.stringify(body)).toBe(validRequest(body));
+    for (const body of [null, [], "text", 7]) expect(parseReviewRequest(body).ok).toBe(false);
+  });
+
+  it("TST-017: each review adds exactly one schema-valid line and leaves earlier bytes untouched", async () => {
+    await fixtureStore();
+    const schema = JSON.parse(await readFile(new URL("../../../docs/design/data/review-line.schema.json", import.meta.url), "utf8"));
+    const validLine = addFormats(new Ajv2020({ allErrors: true, strict: false })).compile(schema);
+    const file = join(store, "reviews.jsonl");
+    const results = ["right", "right", "wrong", "right"] as const;
+    for (const [i, result] of results.entries()) {
+      const before = await readFile(file);
+      expect((await recordReview(store, { question: "dueconcept#q1", result })).ok).toBe(true);
+      const after = await readFile(file);
+      expect(after.subarray(0, before.length).equals(before)).toBe(true);
+      const added = after.subarray(before.length).toString();
+      expect(added.indexOf("\n")).toBe(added.length - 1);
+      expect(validLine(JSON.parse(added)), JSON.stringify(validLine.errors)).toBe(true);
+      expect(after.toString().trim().split("\n")).toHaveLength(i + 1);
+    }
+  });
+
+  it("appends after existing content without touching it", async () => {
+    await writeFile(join(store, "reviews.jsonl"), '{"question":"x#q1","at":"2026-11-01T10:00:00Z","result":"right"}\n');
+    await appendReviewLine(store, { question: "x#q2", at: "2026-11-02T10:00:00.000Z", result: "wrong" });
+    expect((await loadReviewLines(store)).map((l) => l.question)).toEqual(["x#q1", "x#q2"]);
+  });
+
+  it("starts a new line when the log lacks a trailing newline, leaving earlier bytes untouched", async () => {
+    const file = join(store, "reviews.jsonl");
+    await writeFile(file, '{"question":"x#q1","at":"2026-11-01T10:00:00Z","result":"right"}');
+    const before = await readFile(file);
+    await appendReviewLine(store, { question: "x#q2", at: "2026-11-02T10:00:00.000Z", result: "wrong" });
+    const after = await readFile(file);
+    expect(after.subarray(0, before.length).equals(before)).toBe(true);
+    expect(after.subarray(before.length).toString()).toBe('\n{"question":"x#q2","at":"2026-11-02T10:00:00.000Z","result":"wrong"}\n');
+    expect((await loadReviewLines(store)).map((l) => l.question)).toEqual(["x#q1", "x#q2"]);
+  });
+
+  it("replays the new state: right moves up, wrong returns to box 1, counting from the review day", async () => {
+    await fixtureStore();
+    const right = await recordReview(store, { question: "dueconcept#q1", result: "right" }, new Date(2026, 10, 20, 12));
+    expect(right).toMatchObject({ ok: true, state: { box: 2, due: addDays("2026-11-20", 3) } });
+    const wrong = await recordReview(store, { question: "dueconcept#q1", result: "wrong" }, new Date(2026, 10, 21, 12));
+    expect(wrong).toMatchObject({ ok: true, state: { box: 1, due: "2026-11-22" } });
+  });
+
+  it("refuses an unknown concept, an unknown question or an unreadable concept without appending", async () => {
+    await fixtureStore();
+    await writeFile(join(store, "concepts", "broken.md"), "not a concept");
+    for (const question of ["nope#q1", "dueconcept#q9", "broken#q1", "Bad_Id#q1"]) {
+      expect((await recordReview(store, { question, result: "right" })).ok, question).toBe(false);
+    }
+    expect(await readFile(join(store, "reviews.jsonl"), "utf8")).toBe("");
+  });
+
+  it("does not append to a malformed log", async () => {
+    await fixtureStore();
+    await writeFile(join(store, "reviews.jsonl"), "garbage\n");
+    await expect(recordReview(store, { question: "dueconcept#q1", result: "right" })).rejects.toThrow(/line 1/);
+    expect(await readFile(join(store, "reviews.jsonl"), "utf8")).toBe("garbage\n");
   });
 });

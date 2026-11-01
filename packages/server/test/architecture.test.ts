@@ -53,8 +53,27 @@ describe("architecture rules", () => {
         if (/\bsetupStore\b|\bsaveConcept\b|\bwriteConceptAtomic\b|\breplaceConceptAtomic\b|\bextendConcept\b/.test(text) && !file.endsWith("cli.ts")) {
           offenders.push(`${relative(packagesDir, file)} (calls a rules writer)`);
         }
+        if (/\bappendReviewLine\b|\brecordReview\b/.test(text) && !file.endsWith("app.ts")) {
+          offenders.push(`${relative(packagesDir, file)} (calls the review log writer outside app.ts)`);
+        }
       }
     }
     expect(offenders).toEqual([]);
+  });
+
+  it("TST-017: no code path other than the append-mode writer opens reviews.jsonl for writing", () => {
+    const touching = packages
+      .flatMap((pkg) => sourceFiles(join(packagesDir, pkg, "src")))
+      .filter((f) => readFileSync(f, "utf8").includes("reviews.jsonl"))
+      .map((f) => relative(packagesDir, f).replaceAll("\\", "/"))
+      .sort();
+    expect(touching).toEqual(["rules/src/reviews.ts", "rules/src/store.ts"]);
+
+    const reviewsSource = readFileSync(join(packagesDir, "rules", "src", "reviews.ts"), "utf8");
+    expect(reviewsSource.match(/\bopen\(.*\);/g)).toEqual(['open(join(storePath, "reviews.jsonl"), "a+");']);
+    expect(reviewsSource).not.toMatch(/\b(writeFile|appendFile|rename|truncate|unlink|rm)\b/);
+
+    const storeSource = readFileSync(join(packagesDir, "rules", "src", "store.ts"), "utf8");
+    expect(storeSource.match(/writeFile\(reviewsFile[^)]*\)/g)).toEqual(['writeFile(reviewsFile, "", { flag: "wx" })']);
   });
 });

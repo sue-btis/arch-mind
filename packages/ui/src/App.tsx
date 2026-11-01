@@ -4,6 +4,7 @@ import { ConceptDetail } from "./ConceptDetail.tsx";
 import { NO_FILTERS, filterConcepts, type Filters } from "./filter.ts";
 import { LayerView } from "./LayerView.tsx";
 import { MatrixView } from "./MatrixView.tsx";
+import { ReviewScreen } from "./ReviewScreen.tsx";
 import { Sidebar, type FacetCatalog } from "./Sidebar.tsx";
 
 interface Loaded {
@@ -12,7 +13,9 @@ interface Loaded {
   facets: FacetCatalog;
 }
 
-type View = "layers" | "matrix";
+type View = "layers" | "matrix" | "review";
+
+const VIEW_LABELS: Record<View, string> = { layers: "Layers", matrix: "Matrix", review: "Review" };
 
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url);
@@ -79,7 +82,7 @@ export function App() {
         <div className="flex min-w-0 flex-1 flex-col gap-3">
           <div className="flex items-center justify-between px-1">
             <div role="group" aria-label="View" className="flex gap-1 rounded-xl border border-line bg-panel p-1">
-              {(["layers", "matrix"] as const).map((v) => (
+              {(["layers", "matrix", "review"] as const).map((v) => (
                 <button
                   key={v}
                   type="button"
@@ -87,18 +90,19 @@ export function App() {
                   onClick={() => setView(v)}
                   className={`rounded-lg px-3 py-1 text-[13px] ${view === v ? "bg-accent text-on-accent" : "text-ink-muted hover:text-ink"}`}
                 >
-                  {v === "layers" ? "Layers" : "Matrix"}
+                  {VIEW_LABELS[v]}
                 </button>
               ))}
             </div>
             <p className="text-[13px] text-ink-muted" aria-live="polite">
-              {data ? `${shown.length} of ${data.concepts.length} concepts shown` : ""}
+              {data && view !== "review" ? `${shown.length} of ${data.concepts.length} concepts shown` : ""}
             </p>
           </div>
-          <div ref={board} className="border border-line bg-board" data-testid="board" data-view={view}>
+          <div ref={board} hidden={view === "review"} className="border border-line bg-board" data-testid="board" data-view={view}>
             {data && view === "layers" && <LayerView concepts={shown} boardWidth={boardWidth} onOpen={open} />}
             {data && view === "matrix" && <MatrixView concepts={shown} boardWidth={boardWidth} onOpen={open} />}
           </div>
+          {view === "review" && <ReviewScreen titles={titles} onOpenConcept={open} />}
         </div>
       </div>
       {selected && <ConceptDetail id={selected} titles={titles} onClose={close} />}
