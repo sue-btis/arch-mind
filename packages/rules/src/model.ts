@@ -1,3 +1,5 @@
+export * from "./pictograms.ts";
+
 export const LAYERS = ["client", "network", "server", "data"] as const;
 export type Layer = (typeof LAYERS)[number];
 
@@ -30,6 +32,8 @@ export interface Concept {
   id: string;
   title: string;
   layer: Layer;
+  pictogram?: string;
+  hasIllustration?: boolean;
   domains: string[];
   concerns: string[];
   seeI: SeeI;

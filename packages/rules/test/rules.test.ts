@@ -6,8 +6,13 @@ import addFormats from "ajv-formats";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { tst032Concepts, tst032RelationCount } from "../fixtures/tst-032.ts";
 import {
+  ID_PATTERN,
+  LAYERS,
+  LAYER_PICTOGRAM_IDS,
+  PICTOGRAMS,
   StoreError,
   extendConcept,
+  isPictogramId,
   loadConcept,
   loadConcepts,
   loadConfig,
@@ -17,6 +22,7 @@ import {
   saveConcept,
   serializeConcept,
   setupStore,
+  writeConceptAtomic,
   type Concept,
 } from "../src/index.ts";
 
@@ -431,5 +437,75 @@ describe("extend and replace (TST-010, AC-2, AC-3, AC-4)", () => {
     await replaceConceptAtomic(store, { ...current, title: "Replaced" });
     expect(((await loadConcept(store, "alpha")) as { concept: Concept }).concept.title).toBe("Replaced");
     expect(await concepts()).toEqual(["alpha.md", "beta.md", "gamma.md"]);
+  });
+});
+
+describe("pictogram (TST-021, AC-025, AC-029-r)", () => {
+  let dir: string;
+  let store: string;
+  const withPictogram = (id: string, pictogram: string): Concept => ({ ...full, id, pictogram });
+
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), "arch-mind-pictogram-"));
+    store = join(dir, "store");
+    await setupStore(store, join(dir, "home", ".arch-mind", "config.json"));
+  });
+  afterEach(() => rm(dir, { recursive: true, force: true }));
+
+  it("catalogs the four layer ids first and gives every entry a unique id and a one-line meaning", () => {
+    expect(PICTOGRAMS.slice(0, 4).map((p) => p.id)).toEqual([...LAYERS]);
+    expect(LAYER_PICTOGRAM_IDS).toEqual(LAYERS);
+    expect(new Set(PICTOGRAMS.map((p) => p.id)).size).toBe(PICTOGRAMS.length);
+    for (const p of PICTOGRAMS) {
+      expect(p.id).toMatch(ID_PATTERN);
+      expect(p.meaning).toMatch(/^[^\n]+$/);
+    }
+    expect(tst032Concepts.every((c) => c.pictogram !== undefined && isPictogramId(c.pictogram))).toBe(true);
+  });
+
+  it("round-trips a pictogram and writes its key right after layer", () => {
+    const concept = withPictogram("cookie-prefix", "cookie-house");
+    const text = serializeConcept(concept);
+    expect(parseConcept(text)).toEqual(concept);
+    const keys = [...text.split("\n---\n")[0]!.matchAll(/^([a-z]+):/gm)].map((m) => m[1]);
+    expect(keys.slice(0, 4)).toEqual(["id", "title", "layer", "pictogram"]);
+    expect(validConcept(parseConcept(text))).toBe(true);
+  });
+
+  it("writes no pictogram key for a concept without one", () => {
+    expect(serializeConcept(full)).not.toContain("pictogram");
+    expect(parseConcept(serializeConcept(full)).pictogram).toBeUndefined();
+  });
+
+  it("rejects a pictogram that is not a kebab-case id", () => {
+    const text = serializeConcept(full).replace("layer: client\n", "layer: client\npictogram: Not An Id\n");
+    expect(() => parseConcept(text)).toThrow(/\/pictogram/);
+  });
+
+  it("keeps the pictogram when a concept is extended", async () => {
+    await writeConceptAtomic(store, { ...withPictogram("alpha", "lock-upgrade"), relations: [] });
+    const out = await extendConcept(store, { id: "alpha", episodes: [{ project: "p", situation: "again" }] });
+    expect(out.ok).toBe(true);
+    expect(((await loadConcept(store, "alpha")) as { concept: Concept }).concept.pictogram).toBe("lock-upgrade");
+  });
+
+  it("loads a concept with an unknown pictogram id and lists the file in problems, also on a cache hit", async () => {
+    await writeConceptAtomic(store, { ...withPictogram("alpha", "cookie-house"), relations: [] });
+    await writeConceptAtomic(store, { ...withPictogram("beta", "no-such-picture"), relations: [] });
+    for (let load = 0; load < 2; load++) {
+      const { concepts, problems } = await loadConcepts(store);
+      expect(concepts.map((c) => c.id)).toEqual(["alpha", "beta"]);
+      expect(problems).toEqual([{ file: "beta.md", reason: expect.stringContaining('"no-such-picture"') }]);
+    }
+  });
+
+  it("serves hasIllustration as false in the list, not in the stored concept, and never writes it to the file", async () => {
+    await writeConceptAtomic(store, { ...withPictogram("alpha", "shield"), relations: [] });
+    const { concepts } = await loadConcepts(store);
+    expect(concepts[0]!.hasIllustration).toBe(false);
+    expect(((await loadConcept(store, "alpha")) as { concept: Concept }).concept.hasIllustration).toBeUndefined();
+    expect(await readFile(join(store, "concepts", "alpha.md"), "utf8")).not.toContain("hasIllustration");
+    await extendConcept(store, { id: "alpha", episodes: [{ project: "p", situation: "again" }] });
+    expect(await readFile(join(store, "concepts", "alpha.md"), "utf8")).not.toContain("hasIllustration");
   });
 });

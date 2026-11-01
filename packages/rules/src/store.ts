@@ -4,7 +4,7 @@ import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { parseConcept, serializeConcept } from "./concept-file.ts";
-import { ID_PATTERN, SEE_I_PARTS, type Concept, type Facets, type FileProblem, type RuleError } from "./model.ts";
+import { ID_PATTERN, SEE_I_PARTS, isPictogramId, type Concept, type Facets, type FileProblem, type RuleError } from "./model.ts";
 import { validateExtension, validateNewConcept } from "./validate.ts";
 
 export class StoreError extends Error {}
@@ -139,6 +139,9 @@ async function readConceptFile(storePath: string, name: string): Promise<Concept
   return structuredClone(await parsing);
 }
 
+// Derived on every read and never stored (concept.schema.json has no such key); no illustration can be valid before the illustration validator exists.
+export const withDerived = (concept: Concept): Concept => ({ ...concept, hasIllustration: false });
+
 export async function loadConcepts(storePath: string): Promise<{ concepts: Concept[]; problems: FileProblem[] }> {
   const concepts: Concept[] = [];
   const problems: FileProblem[] = [];
@@ -147,7 +150,11 @@ export async function loadConcepts(storePath: string): Promise<{ concepts: Conce
   for (const cached of cache?.keys() ?? []) if (!names.includes(cached)) cache!.delete(cached);
   for (const name of names) {
     try {
-      concepts.push(await readConceptFile(storePath, name));
+      const concept = await readConceptFile(storePath, name);
+      concepts.push(withDerived(concept));
+      if (concept.pictogram !== undefined && !isPictogramId(concept.pictogram)) {
+        problems.push({ file: name, reason: `unknown pictogram "${concept.pictogram}"; the concept is drawn with its layer pictogram` });
+      }
     } catch (error) {
       problems.push({ file: name, reason: (error as Error).message });
     }

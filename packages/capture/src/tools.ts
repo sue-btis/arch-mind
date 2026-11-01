@@ -1,4 +1,4 @@
-import { extendConcept, loadConcept, loadConcepts, loadFacets, saveConcept } from "@arch-mind/rules";
+import { PICTOGRAMS, extendConcept, loadConcept, loadConcepts, loadFacets, saveConcept } from "@arch-mind/rules";
 
 const idSchema = { type: "string", pattern: "^[a-z0-9]+(-[a-z0-9]+)*$" };
 const text = { type: "string", minLength: 1 };
@@ -92,8 +92,17 @@ export async function runTool(storePath: string, name: string, args: unknown): P
     return {
       isError: false,
       structured: {
-        concepts: concepts.map(({ id, title, layer, domains, concerns }) => ({ id, title, layer, domains, concerns })),
+        concepts: concepts.map(({ id, title, layer, pictogram, hasIllustration, domains, concerns }) => ({
+          id,
+          title,
+          layer,
+          ...(pictogram !== undefined && { pictogram }),
+          hasIllustration,
+          domains,
+          concerns,
+        })),
         facets: { domains, concerns },
+        pictograms: PICTOGRAMS,
       },
     };
   }

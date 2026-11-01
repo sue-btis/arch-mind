@@ -74,7 +74,7 @@ export function Sidebar({
       {problems.length > 0 && (
         <section aria-labelledby="problems-title" data-testid="problems">
           <h2 id="problems-title" className="mb-1.5 text-[11px] font-semibold uppercase tracking-widest text-ink-muted">
-            Files that could not be read ({problems.length})
+            Files with problems ({problems.length})
           </h2>
           <ul className="flex flex-col gap-2 text-[13px]">
             {problems.map((p) => (

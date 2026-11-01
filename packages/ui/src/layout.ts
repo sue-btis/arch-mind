@@ -1,6 +1,7 @@
 import ELK from "elkjs/lib/elk.bundled.js";
-import type { ElkExtendedEdge } from "elkjs/lib/elk-api";
-import { LAYERS, type Concept, type Layer } from "@arch-mind/rules/model";
+import type { ElkExtendedEdge, ElkNode } from "elkjs/lib/elk-api";
+import { LAYERS, isPictogramId, type Concept, type Layer } from "@arch-mind/rules/model";
+import { OBJECT_HEIGHT, SQUASH, chipLines, chipSize } from "./metrics.ts";
 
 export function designators(concepts: Concept[]): Map<string, string> {
   const counters = new Map<Layer, number>();
@@ -13,147 +14,144 @@ export function designators(concepts: Concept[]): Map<string, string> {
   );
 }
 
-export const NODE_WIDTH = 176;
-export const NODE_HEIGHT = 48;
+// elk lays out the plane that the plates are projected from. A cell is the room one concept takes on screen,
+// seen from above: a plate unit of depth is only SQUASH of a pixel high, so a cell is tall in plate units.
+// Its width also has to hold the sheared label below the ground point.
+export const CELL_WIDTH = 190;
+export const CELL_HEIGHT = OBJECT_HEIGHT / SQUASH;
+export const BAND_PAD = 28;
 const MARGIN = 16;
-const BAND_PAD_TOP = 30;
-const BAND_PAD_BOTTOM = 14;
-const BAND_GAP = 12;
-const EMPTY_BAND_HEIGHT = 28;
 
 export interface Point {
   x: number;
   y: number;
 }
 
-export interface LayoutNode {
-  id: string;
-  designator: string;
-  title: string;
-  layer: Layer;
+export interface Rect {
   x: number;
   y: number;
   width: number;
   height: number;
 }
 
-interface LabelBox {
-  at: Point;
-  halfWidth: number;
-  halfHeight: number;
-}
-
-export interface LayoutBand {
+export interface PlateNode extends Rect {
+  id: string;
+  designator: string;
+  title: string;
   layer: Layer;
-  empty: boolean;
-  y: number;
-  height: number;
+  pictogram: string;
 }
 
-export interface LayoutEdge {
+export interface PlateBand {
+  layer: Layer;
+  top: number;
+  bottom: number;
+}
+
+export interface PlateEdge {
   id: string;
   source: string;
   target: string;
   label: string;
   citation: string;
   explanation: string;
-  points: Point[];
-  labelAt: Point;
+  route: Point[];
+  labelBox: Rect;
 }
 
-export interface Layout {
+export interface PlateLayout {
   width: number;
-  height: number;
-  nodes: LayoutNode[];
-  bands: LayoutBand[];
-  edges: LayoutEdge[];
+  nodes: PlateNode[];
+  // One cell per layer that carries the plate's pictogram and caption; elk places it so no wire crosses it.
+  marks: PlateNode[];
+  bands: PlateBand[];
+  edges: PlateEdge[];
+  shown: Record<Layer, number>;
 }
 
 const elk = new ELK();
 
-export async function layoutConcepts(concepts: Concept[]): Promise<Layout> {
+export function pictogramFor(concept: Concept): string {
+  return concept.pictogram !== undefined && isPictogramId(concept.pictogram) ? concept.pictogram : concept.layer;
+}
+
+const markId = (layer: Layer) => `mark:${layer}`;
+
+export async function layoutConcepts(concepts: Concept[]): Promise<PlateLayout> {
   const ids = new Set(concepts.map((c) => c.id));
   const relations = concepts.flatMap((c) =>
     c.relations
       .filter((r) => ids.has(r.to) && r.to !== c.id)
       .map((r) => ({ from: c.id, to: r.to, label: r.type, citation: r.source, explanation: r.explanation })),
   );
+  const names = designators(concepts);
+  const cell = (id: string, layer: Layer) => ({
+    id,
+    width: CELL_WIDTH,
+    height: CELL_HEIGHT,
+    layoutOptions: { "elk.partitioning.partition": String(LAYERS.indexOf(layer)) },
+  });
 
-  const solved = await elk.layout({
+  const solved: ElkNode = await elk.layout({
     id: "root",
     layoutOptions: {
       "elk.algorithm": "layered",
       "elk.direction": "DOWN",
       "elk.partitioning.activate": "true",
-      "elk.spacing.nodeNode": "24",
-      "elk.layered.spacing.nodeNodeBetweenLayers": "64",
       "elk.edgeRouting": "ORTHOGONAL",
+      "elk.separateConnectedComponents": "false",
+      "elk.spacing.nodeNode": "24",
+      "elk.layered.spacing.nodeNodeBetweenLayers": "24",
+      "elk.spacing.edgeNode": "14",
+      "elk.spacing.edgeEdge": "14",
+      "elk.layered.spacing.edgeNodeBetweenLayers": "28",
+      "elk.layered.spacing.edgeEdgeBetweenLayers": "14",
+      "elk.spacing.edgeLabel": "6",
+      "elk.edgeLabels.inline": "true",
+      "elk.layered.nodePlacement.strategy": "SIMPLE",
+      "elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES",
     },
-    children: concepts.map((c) => ({
-      id: c.id,
-      width: NODE_WIDTH,
-      height: NODE_HEIGHT,
-      layoutOptions: { "elk.partitioning.partition": String(LAYERS.indexOf(c.layer)) },
-    })),
-    edges: relations.map((r, i) => ({ id: `e${i}`, sources: [r.from], targets: [r.to] })),
+    children: [...LAYERS.map((layer) => cell(markId(layer), layer)), ...concepts.map((c) => cell(c.id, c.layer))],
+    edges: relations.map((r, i) => {
+      const size = chipSize(chipLines(r.label));
+      return {
+        id: `e${i}`,
+        sources: [r.from],
+        targets: [r.to],
+        labels: [{ id: `l${i}`, text: r.label, width: size.width, height: size.height / SQUASH, layoutOptions: { "elk.edgeLabels.inline": "true" } }],
+      };
+    }),
   });
 
-  const names = designators(concepts);
-  const raw = concepts.map((c): LayoutNode => {
-    const child = solved.children?.find((n) => n.id === c.id);
-    return {
-      id: c.id,
-      designator: names.get(c.id)!,
-      title: c.title,
-      layer: c.layer,
-      x: (child?.x ?? 0) + MARGIN,
-      y: child?.y ?? 0,
-      width: NODE_WIDTH,
-      height: NODE_HEIGHT,
-    };
-  });
+  const place = (id: string): Rect => {
+    const child = solved.children!.find((n) => n.id === id)!;
+    return { x: (child.x ?? 0) + MARGIN, y: child.y ?? 0, width: child.width ?? CELL_WIDTH, height: child.height ?? CELL_HEIGHT };
+  };
+  const nodes = concepts.map(
+    (c): PlateNode => ({ id: c.id, designator: names.get(c.id)!, title: c.title, layer: c.layer, pictogram: pictogramFor(c), ...place(c.id) }),
+  );
+  const marks = LAYERS.map((layer): PlateNode => ({ id: markId(layer), designator: "", title: layer, layer, pictogram: layer, ...place(markId(layer)) }));
 
-  // Bands hug the nodes elk placed in each partition. An empty layer gets a thin
-  // band (DEC-Q3): everything below the cut moves down, which keeps every
-  // orthogonal edge orthogonal because a segment's two ends share one shift.
   const extents = LAYERS.map((layer) => {
-    const own = raw.filter((n) => n.layer === layer);
-    if (own.length === 0) return null;
+    const own = [...nodes, ...marks].filter((n) => n.layer === layer);
+    return { layer, top: Math.min(...own.map((n) => n.y)), bottom: Math.max(...own.map((n) => n.y + n.height)) };
+  });
+  // A band reaches half way into the gap to its neighbour, at most BAND_PAD, so bands never overlap.
+  const bands = extents.map((e, i): PlateBand => {
+    const before = extents[i - 1];
+    const after = extents[i + 1];
     return {
-      top: Math.min(...own.map((n) => n.y)) - BAND_PAD_TOP,
-      bottom: Math.max(...own.map((n) => n.y + n.height)) + BAND_PAD_BOTTOM,
+      layer: e.layer,
+      top: e.top - Math.min(BAND_PAD, before ? Math.max(0, (e.top - before.bottom) / 2) : BAND_PAD),
+      bottom: e.bottom + Math.min(BAND_PAD, after ? Math.max(0, (after.top - e.bottom) / 2) : BAND_PAD),
     };
   });
-  const tops = extents.filter((e) => e !== null).map((e) => e.top);
-  const origin = tops.length > 0 ? Math.min(...tops) : 0;
-  const cuts: number[] = [];
-  const shiftAt = (y: number) => cuts.filter((c) => c <= y).length * (EMPTY_BAND_HEIGHT + BAND_GAP);
 
-  const bands: LayoutBand[] = [];
-  let previousBottom = origin - BAND_GAP;
-  LAYERS.forEach((layer, i) => {
-    const extent = extents[i];
-    if (extent) {
-      bands.push({ layer, empty: false, y: extent.top + shiftAt(extent.top) - origin, height: extent.bottom - extent.top });
-      previousBottom = extent.bottom;
-    } else {
-      const cut = previousBottom + BAND_GAP;
-      bands.push({ layer, empty: true, y: cut + shiftAt(cut) - origin, height: EMPTY_BAND_HEIGHT });
-      cuts.push(cut);
-      previousBottom = cut - BAND_GAP;
-    }
-  });
-
-  const nodes = raw.map((n) => ({ ...n, y: n.y + shiftAt(n.y) - origin }));
-  const placed: LabelBox[] = [];
-  const edges = relations.map((r, i): LayoutEdge => {
-    const section = (solved.edges as ElkExtendedEdge[] | undefined)?.find((e) => e.id === `e${i}`)?.sections?.[0];
-    const points = section
-      ? [section.startPoint, ...(section.bendPoints ?? []), section.endPoint].map((p) => ({
-          x: p.x + MARGIN,
-          y: p.y + shiftAt(p.y) - origin,
-        }))
-      : [];
+  const edges = relations.map((r, i): PlateEdge => {
+    const solvedEdge = (solved.edges as ElkExtendedEdge[]).find((e) => e.id === `e${i}`)!;
+    const section = solvedEdge.sections![0]!;
+    const label = solvedEdge.labels![0]!;
+    const route = [section.startPoint, ...(section.bendPoints ?? []), section.endPoint].map((p) => ({ x: p.x + MARGIN, y: p.y }));
     return {
       id: `e${i}`,
       source: r.from,
@@ -161,50 +159,13 @@ export async function layoutConcepts(concepts: Concept[]): Promise<Layout> {
       label: r.label,
       citation: r.citation,
       explanation: r.explanation,
-      points,
-      labelAt: labelPoint(points, r.label, nodes, placed),
+      route,
+      labelBox: { x: (label.x ?? 0) + MARGIN, y: label.y ?? 0, width: label.width ?? 0, height: label.height ?? 0 },
     };
   });
 
-  const last = bands[bands.length - 1]!;
-  const width = Math.max(...nodes.map((n) => n.x + n.width), 0) + MARGIN;
-  return { width: Math.max(width, 2 * MARGIN), height: last.y + last.height, nodes, bands, edges };
-}
-
-// Candidate spots run along the longest segments first; the first one whose text box clears every
-// node, every bend of its own wire and every label already placed wins, otherwise the middle of the
-// longest segment. Short horizontal runs are skipped so the box does not swallow the whole run.
-function labelPoint(points: Point[], label: string, nodes: LayoutNode[], placed: LabelBox[]): Point {
-  const segments = points
-    .slice(1)
-    .map((b, i) => ({ a: points[i]!, b }))
-    .sort((s1, s2) => length(s2) - length(s1));
-  const halfWidth = label.length * 3.4 + 6;
-  const halfHeight = 9;
-  const bends = points.slice(1, -1);
-  const clear = (p: Point) =>
-    nodes.every(
-      (n) =>
-        p.x + halfWidth < n.x || p.x - halfWidth > n.x + n.width || p.y + halfHeight < n.y || p.y - halfHeight > n.y + n.height,
-    ) &&
-    bends.every((bend) => Math.abs(bend.x - p.x) > halfWidth || Math.abs(bend.y - p.y) > halfHeight) &&
-    placed.every((o) => Math.abs(o.at.x - p.x) > o.halfWidth + halfWidth || Math.abs(o.at.y - p.y) > o.halfHeight + halfHeight);
-  for (const { a, b } of segments) {
-    if (a.y === b.y && Math.abs(b.x - a.x) < 2 * halfWidth + 16) continue;
-    for (const t of [0.5, 0.3, 0.7, 0.2, 0.8, 0.1, 0.9]) {
-      const p = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
-      if (clear(p)) {
-        placed.push({ at: p, halfWidth, halfHeight });
-        return p;
-      }
-    }
-  }
-  const first = segments[0];
-  const fallback = first ? { x: (first.a.x + first.b.x) / 2, y: (first.a.y + first.b.y) / 2 } : { x: 0, y: 0 };
-  placed.push({ at: fallback, halfWidth, halfHeight });
-  return fallback;
-}
-
-function length({ a, b }: { a: Point; b: Point }) {
-  return Math.abs(b.x - a.x) + Math.abs(b.y - a.y);
+  const shown = { client: 0, network: 0, server: 0, data: 0 } satisfies Record<Layer, number>;
+  for (const c of concepts) shown[c.layer]++;
+  const right = Math.max(...[...nodes, ...marks].map((n) => n.x + n.width), ...edges.map((e) => e.labelBox.x + e.labelBox.width));
+  return { width: right + MARGIN, nodes, marks, bands, edges, shown };
 }

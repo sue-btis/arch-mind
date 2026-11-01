@@ -2,6 +2,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { LAYERS, PICTOGRAMS } from "@arch-mind/rules";
 
 const packagesDir = fileURLToPath(new URL("../../", import.meta.url));
 
@@ -75,5 +76,22 @@ describe("architecture rules", () => {
 
     const storeSource = readFileSync(join(packagesDir, "rules", "src", "store.ts"), "utf8");
     expect(storeSource.match(/writeFile\(reviewsFile[^)]*\)/g)).toEqual(['writeFile(reviewsFile, "", { flag: "wx" })']);
+  });
+
+  it("TST-024: @xyflow/react is not a UI dependency and no UI source imports it", () => {
+    const manifest = JSON.parse(readFileSync(join(packagesDir, "ui", "package.json"), "utf8"));
+    const deps = { ...manifest.dependencies, ...manifest.devDependencies, ...manifest.peerDependencies };
+    expect(Object.keys(deps).filter((name) => name.startsWith("@xyflow/"))).toEqual([]);
+    const importers = sourceFiles(join(packagesDir, "ui", "src")).filter((file) => /@xyflow\//.test(readFileSync(file, "utf8")));
+    expect(importers.map((f) => relative(packagesDir, f))).toEqual([]);
+  });
+
+  it("TST-025: the catalog ids and the artwork symbol ids are the same set and include the four layer ids", () => {
+    const artwork = readFileSync(join(packagesDir, "ui", "src", "pictogram-art.tsx"), "utf8");
+    const symbols = [...artwork.matchAll(/<symbol id="([^"]+)"/g)].map((m) => m[1]!);
+    const catalog = PICTOGRAMS.map((p) => p.id);
+    expect(new Set(symbols).size).toBe(symbols.length);
+    expect([...symbols].sort()).toEqual([...catalog].sort());
+    for (const layer of LAYERS) expect(symbols).toContain(layer);
   });
 });

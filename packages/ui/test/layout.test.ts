@@ -3,46 +3,66 @@ import { LAYERS, type Concept } from "@arch-mind/rules/model";
 import { overWideConcepts, tst032Concepts, tst032RelationCount } from "@arch-mind/rules/fixtures";
 import { layoutConcepts } from "../src/layout.ts";
 
-const MAX_WIDTH = 1366;
-
-describe("layer view layout (TST-008 geometry, AC-7, AC-8)", () => {
-  it("lays the TST-032 fixture out within 1366 px, one node per concept and one edge per relation", async () => {
+describe("plate layout (TST-022, AC-024)", () => {
+  it("places one node per concept and one routed, labeled edge per relation of the TST-032 fixture", async () => {
     const out = await layoutConcepts(tst032Concepts);
-    console.log(`TST-032 layout: ${out.width} x ${out.height} px`);
-    expect(out.width).toBeLessThanOrEqual(MAX_WIDTH);
     expect(out.nodes).toHaveLength(13);
     expect(out.edges).toHaveLength(tst032RelationCount);
-    expect(out.edges.every((e) => e.label.length > 0)).toBe(true);
+    for (const e of out.edges) {
+      expect(e.label.length).toBeGreaterThan(0);
+      expect(e.route.length).toBeGreaterThanOrEqual(2);
+      expect(e.labelBox.width).toBeGreaterThan(0);
+    }
   });
 
-  it("always draws the four bands in order without overlap and keeps each concept in its band", async () => {
+  it("keeps the four bands in layer order, apart, with every node and layer mark inside its own band", async () => {
     const out = await layoutConcepts(tst032Concepts);
     expect(out.bands.map((b) => b.layer)).toEqual([...LAYERS]);
-    for (let i = 1; i < out.bands.length; i++) {
-      expect(out.bands[i]!.y).toBeGreaterThanOrEqual(out.bands[i - 1]!.y + out.bands[i - 1]!.height);
+    for (let i = 1; i < out.bands.length; i++) expect(out.bands[i]!.top).toBeGreaterThanOrEqual(out.bands[i - 1]!.bottom);
+    for (const node of [...out.nodes, ...out.marks]) {
+      const band = out.bands[LAYERS.indexOf(node.layer)]!;
+      expect(node.y, node.id).toBeGreaterThanOrEqual(band.top);
+      expect(node.y + node.height, node.id).toBeLessThanOrEqual(band.bottom);
+      expect(node.x + node.width, node.id).toBeLessThanOrEqual(out.width);
     }
-    for (const node of out.nodes) {
-      const band = out.bands.find((b) => b.layer === node.layer)!;
-      expect(node.y).toBeGreaterThanOrEqual(band.y);
-      expect(node.y + node.height).toBeLessThanOrEqual(band.y + band.height);
-    }
-    const data = out.bands.find((b) => b.layer === "data")!;
-    expect(data.height).toBeLessThan(out.bands.find((b) => b.layer === "server")!.height);
+    expect(out.shown).toEqual({ client: 6, network: 5, server: 2, data: 0 });
   });
 
-  it("keeps band order when a relation runs from a lower layer to a higher one (ASM-3)", async () => {
-    const upward = tst032Concepts.flatMap((c) => c.relations.map((r) => ({ from: c, to: tst032Concepts.find((t) => t.id === r.to)! })))
+  it("keeps band order when a relation runs from a lower layer to a higher one", async () => {
+    const upward = tst032Concepts
+      .flatMap((c) => c.relations.map((r) => ({ from: c, to: tst032Concepts.find((t) => t.id === r.to)! })))
       .filter(({ from, to }) => LAYERS.indexOf(from.layer) > LAYERS.indexOf(to.layer));
     expect(upward.length).toBeGreaterThan(0);
     const out = await layoutConcepts(tst032Concepts);
-    const y = (layer: string) => out.bands.find((b) => b.layer === layer)!.y;
-    expect(y("client")).toBeLessThan(y("network"));
-    expect(y("network")).toBeLessThan(y("server"));
-    expect(y("server")).toBeLessThan(y("data"));
+    const tops = out.bands.map((b) => b.top);
+    expect(tops).toEqual([...tops].sort((a, b) => a - b));
   });
 
-  it("draws four thin bands for an empty store and ignores relations to unknown concepts", async () => {
+  it("starts each route on a border of its source's cell and ends it on a border of its target's", async () => {
+    const out = await layoutConcepts(tst032Concepts);
+    const node = (id: string) => out.nodes.find((n) => n.id === id)!;
+    const onBorder = (p: { x: number; y: number }, n: { x: number; y: number; width: number; height: number }) =>
+      Math.abs(p.y - n.y) < 0.5 || Math.abs(p.y - (n.y + n.height)) < 0.5;
+    for (const e of out.edges) {
+      expect(onBorder(e.route[0]!, node(e.source)), `${e.id} start`).toBe(true);
+      expect(onBorder(e.route[e.route.length - 1]!, node(e.target)), `${e.id} end`).toBe(true);
+    }
+  });
+
+  it("gives a concept its own pictogram, or its layer's when it has none or an unknown id", async () => {
+    const base = tst032Concepts[0]!;
+    const out = await layoutConcepts([
+      { ...base, id: "own", pictogram: "shield", relations: [] },
+      { ...base, id: "none", pictogram: undefined, relations: [] },
+      { ...base, id: "unknown", pictogram: "no-such-picture", relations: [] },
+      { ...base, id: "elsewhere", layer: "data", pictogram: undefined, relations: [] },
+    ]);
+    expect(out.nodes.map((n) => n.pictogram)).toEqual(["shield", "client", "client", "data"]);
+  });
+
+  it("draws four bands for an empty store and ignores relations to unknown concepts", async () => {
     const empty = await layoutConcepts([]);
+    expect(empty.nodes).toEqual([]);
     expect(empty.bands).toHaveLength(4);
     const lonely: Concept = { ...tst032Concepts[0]!, relations: [{ type: "x", to: "ghost", source: "s", explanation: "e" }] };
     const one = await layoutConcepts([lonely]);
@@ -64,27 +84,9 @@ describe("layer view layout (TST-008 geometry, AC-7, AC-8)", () => {
     expect(edge.explanation).toContain("Secure attribute");
   });
 
-  it("TST-014: the over-wide fixture lays out wider than the 1366 px reference screen", async () => {
+  it("puts the 13 spokes of the over-wide fixture in one row", async () => {
     const out = await layoutConcepts(overWideConcepts);
-    expect(out.width).toBeGreaterThan(MAX_WIDTH);
-  });
-
-  it("keeps every label off the bends of its own wire and off other labels", async () => {
-    const out = await layoutConcepts(tst032Concepts);
-    const halfHeight = 9;
-    const half = (label: string) => label.length * 3.4 + 6;
-    for (const e of out.edges) {
-      for (const bend of e.points.slice(1, -1)) {
-        const covered = Math.abs(bend.x - e.labelAt.x) <= half(e.label) && Math.abs(bend.y - e.labelAt.y) <= halfHeight;
-        expect(covered, `${e.id} ${e.label} covers a bend`).toBe(false);
-      }
-    }
-    for (const [i, a] of out.edges.entries()) {
-      for (const b of out.edges.slice(i + 1)) {
-        const overlap =
-          Math.abs(a.labelAt.x - b.labelAt.x) <= half(a.label) + half(b.label) && Math.abs(a.labelAt.y - b.labelAt.y) <= 2 * halfHeight;
-        expect(overlap, `${a.id} and ${b.id} labels overlap`).toBe(false);
-      }
-    }
+    const spokes = out.nodes.filter((n) => n.layer === "server");
+    expect(new Set(spokes.map((n) => Math.round(n.y))).size).toBe(1);
   });
 });

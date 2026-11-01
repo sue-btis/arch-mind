@@ -13,7 +13,6 @@
   "dependencies": {
     "@arch-mind/rules": "workspace:*",
     "@fontsource-variable/inter": "^5.2.0",
-    "@xyflow/react": "12.12.0",
     "elkjs": "0.12.1",
     "react": "19.3.1",
     "react-dom": "19.3.1"

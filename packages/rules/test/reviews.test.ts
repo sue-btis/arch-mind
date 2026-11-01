@@ -109,7 +109,9 @@ describe("reviews.jsonl loader and concept detail", () => {
     if (!detail.ok) return;
     const body = JSON.parse(JSON.stringify({ concept: detail.concept, questions: detail.questions }));
     expect(validDetail(body), JSON.stringify(validDetail.errors)).toBe(true);
-    expect(validConcept(body.concept), JSON.stringify(validConcept.errors)).toBe(true);
+    const { hasIllustration, ...stored } = body.concept;
+    expect(hasIllustration).toBe(false);
+    expect(validConcept(stored), JSON.stringify(validConcept.errors)).toBe(true);
     expect(body.questions[0]).toMatchObject({ question: "cookie#q1", box: 2 });
   });
 

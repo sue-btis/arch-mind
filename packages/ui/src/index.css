@@ -99,44 +99,158 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-.react-flow {
-  --xy-background-color: transparent;
-  --xy-edge-label-background-color: var(--board);
-  --xy-edge-label-color: var(--ink);
-  --xy-edge-stroke: var(--wire);
-  --xy-edge-stroke-width: 1;
+.plates {
+  --obj-line: var(--gray-9);
+  --n1: var(--gray-1);
+  --n2: var(--gray-3);
+  --n3: var(--gray-5);
+  --t-base: var(--gray-0);
+  --s-base: var(--gray-0);
+  --mt: 16%;
+  --ml: 45%;
+  --mr: 80%;
+  --shade: rgb(0 0 0 / 0.08);
   font-family: var(--font-sans);
 }
 
-.react-flow__edge-text {
-  font-size: 11px;
+@media (prefers-color-scheme: dark) {
+  .plates {
+    --obj-line: var(--gray-10);
+    --n1: var(--gray-6);
+    --n2: var(--gray-7);
+    --n3: var(--gray-8);
+    --s-base: var(--gray-10);
+    --mt: 80%;
+    --ml: 72%;
+    --mr: 42%;
+    --shade: rgb(0 0 0 / 0.45);
+  }
 }
 
-.wire {
+/* Not scoped under .plates: Chrome styles the instances of a <use> without the ancestors of the original symbol. */
+.ft,
+.fl,
+.fr,
+.nt,
+.nl,
+.nr {
+  stroke: var(--obj-line);
+  stroke-width: 1;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.ft { fill: var(--ft); }
+.fl { fill: var(--fl); }
+.fr { fill: var(--fr); }
+.nt { fill: var(--n1); }
+.nl { fill: var(--n2); }
+.nr { fill: var(--n3); }
+.ns { stroke: none; }
+
+.ln {
+  fill: none;
+  stroke: var(--obj-line);
+  stroke-width: 1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.sh { stroke-width: 1.75; }
+.lnl { stroke: var(--ft); stroke-width: 1.5; }
+.dash { stroke-dasharray: 3 3; }
+.dk { fill: var(--obj-line); }
+.lt { fill: var(--ft); }
+.gnd { fill: var(--shade); }
+.beam { fill: var(--ft); opacity: 0.55; }
+.gl { font: 700 13px var(--font-sans); fill: var(--obj-line); }
+
+.pic {
+  --ft: color-mix(in srgb, var(--k) var(--mt), var(--t-base));
+  --fl: color-mix(in srgb, var(--k) var(--ml), var(--s-base));
+  --fr: color-mix(in srgb, var(--k) var(--mr), var(--s-base));
+}
+
+.plate-face {
+  fill: var(--k);
+  fill-opacity: 0.07;
+  stroke: var(--k);
+  stroke-opacity: 0.55;
+}
+
+.llab {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  fill: var(--k);
+}
+
+.llab .count,
+.pempty {
+  fill: var(--ink-muted);
+  font-weight: 400;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.pempty { font-size: 13px; }
+
+.wire { outline: none; }
+.wire .hit { fill: none; stroke: transparent; stroke-width: 14; pointer-events: stroke; vector-effect: non-scaling-stroke; }
+.wire .line { fill: none; stroke-width: 1; pointer-events: none; vector-effect: non-scaling-stroke; }
+.wire:hover .line,
+.wire:focus-visible .line { stroke-width: 2.5; }
+.wire:focus-visible .hit { stroke: var(--accent); stroke-opacity: 0.18; }
+
+.chips rect { fill: var(--board); pointer-events: none; }
+.chips text { fill: var(--ink); font-size: 13px; pointer-events: none; }
+
+.obj {
+  cursor: pointer;
   outline: none;
 }
-
-.wire:hover .react-flow__edge-path,
-.wire:focus-visible .react-flow__edge-path {
-  stroke-width: 2.5;
+.obj .focus { display: none; fill: none; stroke: var(--accent); stroke-width: 2; }
+.obj:focus-visible .focus { display: inline; }
+.obj:hover .focus { display: inline; stroke-width: 1; }
+.nlab {
+  font-size: 13px;
+  fill: var(--ink);
+  paint-order: stroke;
+  stroke: var(--board);
+  stroke-width: 4px;
+  stroke-linejoin: round;
 }
+.nlab .des { fill: var(--k); font-weight: 600; font-variant-numeric: tabular-nums; }
 
-/* Re-place: connectors glide to their new zone while the wires, whose routes elk recomputed, wait and then return. */
-.react-flow__node-connector {
+.zoom-btn {
+  min-width: 28px;
+  height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 13px;
+}
+.zoom-btn:hover:not(:disabled) { background: var(--canvas); }
+.zoom-btn:disabled { color: var(--ink-muted); cursor: default; }
+
+/* Re-place: concepts glide to their new spot while the wires, whose routes elk recomputed, wait and then return. */
+.obj {
   transition: transform 320ms var(--ease-out);
-  animation: connector-in 220ms var(--ease-out) backwards;
+  animation: concept-in 220ms var(--ease-out) backwards;
 }
 
-.react-flow__edges {
+.wires,
+.chips {
   transition: opacity 180ms var(--ease-out);
 }
 
-[data-settling] .react-flow__edges {
+[data-settling] .wires,
+[data-settling] .chips {
   opacity: 0;
   transition: opacity 80ms linear;
 }
 
-@keyframes connector-in {
+@keyframes concept-in {
   from {
     opacity: 0;
   }
@@ -175,11 +289,12 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .react-flow__node-connector {
+  .obj {
     transition: none;
   }
 
-  [data-settling] .react-flow__edges {
+  [data-settling] .wires,
+  [data-settling] .chips {
     opacity: 1;
   }
 
