@@ -1,9 +1,10 @@
 # ADR-006 — Layer view layout engine
 
-Status: Accepted
+Status: Superseded
 Date: 2026-10-30
 Decision owners: author
 Accepted by: author, 2026-10-30, «ok elkjs and React Flow» (translated)
+Superseded by: ADR-008
 Related: FR-019, FR-020, FR-023, NFR-001, UX-001
 Reversibility: two-way — layout is computed in one UI module; replacing the engine leaves data and other views untouched.
 

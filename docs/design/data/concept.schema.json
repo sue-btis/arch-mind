@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "arch-mind/concept.schema.json",
   "title": "Concept",
-  "description": "Frontmatter of a concept file plus its SEE-I body, as one object. The capture tools' inputs and outputs are defined in docs/design/api/capture-tools.schema.json. Stored per ADR-002: YAML frontmatter holds every field except seeI; the body holds seeI under the headings '## Statement', '## Elaboration', '## Example', '## Illustration'.",
+  "description": "Frontmatter of a concept file plus its SEE-I body, as one object. The capture tools' inputs and outputs are defined in docs/design/api/capture-tools.schema.json. Stored per ADR-002: YAML frontmatter holds every field except seeI; the body holds seeI under the headings '## Statement', '## Elaboration', '## Example', '## Illustration'. A visual illustration (ADR-009) is the file illustrations/<id>.svg next to the concept files, referenced only by one Markdown image link inside the Illustration part (seeI.illustration); there is no frontmatter field for it, and a concept is complete without it (NFR-004).",
   "type": "object",
   "additionalProperties": false,
   "required": ["id", "title", "layer", "domains", "concerns", "seeI", "relations", "recall"],
@@ -10,6 +10,7 @@
     "id": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "description": "Immutable after first save (BR-002)." },
     "title": { "type": "string", "minLength": 1 },
     "layer": { "enum": ["client", "network", "server", "data"], "description": "Exactly one (BR-003)." },
+    "pictogram": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "description": "Optional id of a library pictogram (BR-008, ADR-009). Membership in the library is checked by the rules module, not by this schema; a missing or unknown id shows the layer's pictogram (FR-038)." },
     "domains": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true, "description": "Values from the facet catalog." },
     "concerns": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true, "description": "Values from the facet catalog." },
     "seeI": {
@@ -20,7 +21,7 @@
         "statement": { "type": "string", "minLength": 1 },
         "elaboration": { "type": "string", "minLength": 1 },
         "example": { "type": "string", "minLength": 1 },
-        "illustration": { "type": "string", "minLength": 1 }
+        "illustration": { "type": "string", "minLength": 1, "description": "May contain one Markdown image link to illustrations/<concept id>.svg (BR-008, ADR-009); the text stays required." }
       }
     },
     "relations": {

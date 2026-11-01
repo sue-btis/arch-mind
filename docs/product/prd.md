@@ -30,6 +30,7 @@ None.
 - G-002 — The author can open a focused view and follow how its concepts relate, including relations that cross layers, without scrolling sideways.
 - G-003 — Weeks after capture, the author can explain a concept and its relations from memory.
 - G-004 — Every relation shown can be traced to its source.
+- G-005 — Each layer and concept is recognizable at a glance through a picture that alludes to the real thing, and selecting a concept shows its neighbourhood without leaving the view.
 
 ## 4. Non-Goals
 - NG-001 — Multiple users, accounts, sharing or collaboration.
@@ -47,14 +48,16 @@ None.
 3. The author keeps some relations and writes one sentence explaining each kept relation.
 4. Claude drafts the concept as SEE-I (statement, elaboration, example, illustration), or the author writes it; the author accepts, edits or rewrites each part.
 5. The author picks the concept's layer, domains and concerns, and names the episode (for example, "TST-032 in the web project").
-6. arch-mind proposes recall questions from what the author wrote; the author confirms them.
-7. The concept is saved as a Markdown file and becomes due for review the next day.
+6. arch-mind proposes a pictogram for the concept and, when the illustration part describes something drawable, a visual illustration; the author accepts, asks for another or declines each.
+7. arch-mind proposes recall questions from what the author wrote; the author confirms them.
+8. The concept is saved as a Markdown file and becomes due for review the next day.
 
 ### J-002 — Study a view
 1. The author opens arch-mind and filters by domain, layer and concern (for example, web × security).
-2. The layer view shows the matching concepts in stacked layer bands with typed arrows.
-3. The author follows a chain across layers, checks a relation's source and explanation, and opens a concept's detail.
-4. The author switches to the matrix view of the same filter to check every relation at once.
+2. The layer view shows the layers as stacked plates, each with its own pictogram, and the matching concepts as pictograms on their plates with typed arrows.
+3. The author selects a concept: it is marked, its relations and neighbours stay prominent and the rest recedes; its incoming and outgoing relations are listed beside the view.
+4. The author follows a chain by choosing the other end of a listed relation, checks each relation's source and explanation, and reads the concept's SEE-I and illustration.
+5. The author switches to the matrix view of the same filter to check every relation at once.
 
 ### J-003 — Daily review
 1. The author opens the review screen and sees the questions due today.
@@ -70,10 +73,10 @@ Turns a concept that came up in a session into a saved concept the author built:
 One readable Markdown file per concept. A concept exists once and every view refers to it. Hand edits are picked up; broken files are reported.
 
 ### CAP-003 — Views
-A layer view for following chains across layers and a matrix view for checking all relations, both over the same facet filter, both fitting one laptop screen. Relations show their type, and on interaction their source and the author's explanation.
+A layer view of stacked layer plates for following chains across layers and a matrix view for checking all relations, both over the same facet filter, both fitting one laptop screen. Layers and concepts carry allusive pictograms. Selecting a concept brings its neighbourhood forward. Relations show their type, and on interaction their source and the author's explanation.
 
 ### CAP-004 — Concept detail
-Shows a concept's SEE-I, relations with sources and explanations, episode, facets and review state.
+Shows a concept's pictogram, SEE-I with its illustration where one exists, incoming and outgoing relations with sources and explanations, episode, facets and review state, beside the view and without hiding the selected concept.
 
 ### CAP-005 — Review
 Shows due recall questions, lets the author self-grade, reschedules by Leitner boxes and keeps the full review history.
@@ -125,6 +128,15 @@ Capture succeeds when the arch-mind app is not running.
 ### FR-014
 A saved concept is a Markdown file that a plain text editor shows with readable SEE-I, relations, sources and recall questions.
 
+### FR-034
+The capture proposes one pictogram for the concept from the pictogram library; the pictogram is saved only after the author accepts it, and the author may ask for another or save the concept without one.
+
+### FR-035
+When the concept's illustration part describes a drawable scene, the capture proposes a visual illustration of it; the illustration is saved only after the author accepts it, and none is proposed when the illustration part is not drawable.
+
+### FR-036
+The author can add a pictogram or a visual illustration to an existing concept that has none, through a capture, under the same confirmation rules.
+
 ### Concept store
 ### FR-015
 Each concept is stored exactly once; views and the review screen refer to stored concepts and never keep their own copies.
@@ -140,7 +152,7 @@ A concept file that cannot be read is listed in the app with its file name and t
 The author can filter views by any combination of domains, layers and concerns.
 
 ### FR-019
-The layer view places each matching concept in the band of its layer, with layers stacked in the order client, network, server, data.
+The layer view places each matching concept on the plate of its layer, with layer plates stacked in the order client, network, server, data.
 
 ### FR-020
 The layer view shows each relation between matching concepts as a directed arrow labeled with its type.
@@ -155,11 +167,29 @@ The matrix view shows the matching concepts as rows and columns, with the relati
 When the matching concepts would not fit the reference screen (NFR-001), the app says so and suggests narrower filters instead of drawing a view that needs sideways scrolling.
 
 ### FR-024
-Selecting a concept in any view opens its detail.
+Selecting a concept in any view opens its detail beside the view without hiding the selected concept.
+
+### FR-037
+Each layer is shown with its own pictogram.
+
+### FR-038
+Each concept is shown with its pictogram; a concept without one is shown with its layer's pictogram.
+
+### FR-039
+Selecting a concept marks it, keeps its relations and the concepts they connect prominent, and makes every other concept and relation recede.
+
+### FR-040
+The detail of a selected concept lists its incoming and outgoing relations, each as source, type and target with its source and explanation; choosing the other end of a listed relation selects that concept.
+
+### FR-041
+The author can clear the selection, which restores every concept and relation to full prominence.
+
+### FR-042
+The author can zoom the layer view in and return it to a size that fits the screen width.
 
 ### Concept detail
 ### FR-025
-The concept detail shows the SEE-I, every relation with its source and explanation, the episode, the facets and the review state of each recall question.
+The concept detail shows the pictogram, the SEE-I with the visual illustration when one exists, every relation with its source and explanation, the episode, the facets and the review state of each recall question.
 
 ### Review
 ### FR-026
@@ -185,7 +215,7 @@ Every review is kept in history with the question, date and result.
 
 ## 8. Non-Functional Requirements
 ### NFR-001 — View readability
-Reference screen: a desktop browser window of 1366 × 768 px at 100 % zoom. Every view the app draws fits the window width with no horizontal scrolling. Acceptance: the 13-concept, 15-relation TST-032 chain from `docs/discovery/spikes/DQ-005-view-layouts/` renders as a layer view and as a matrix view, each without horizontal scrolling. Discovery found no evidence for a maximum node count (DQ-003), so none is set.
+Reference screen: a desktop browser window of 1366 × 768 px at 100 % zoom. Every view the app draws fits the window width with no horizontal scrolling; for the layer view this holds at its fit size (FR-042), and zooming in is the author's choice. Acceptance: the 13-concept, 15-relation TST-032 chain from `docs/discovery/spikes/DQ-005-view-layouts/` renders as a layer view at fit size and as a matrix view, each without horizontal scrolling, with every pictogram and label readable. Discovery found no evidence for a maximum node count (DQ-003), so none is set.
 
 ### NFR-002 — Capture friction
 Excluding the time the author spends writing (SEE-I, explanations, choices), one capture adds at most 60 seconds of waiting and at most 2 confirmation prompts in the Claude Code session. Measured on 5 real captures with up to 3 relations each. Not yet measured: discovery timed only the save itself (DQ-006).
@@ -194,7 +224,7 @@ Excluding the time the author spends writing (SEE-I, explanations, choices), one
 A capture either saves a complete concept file or leaves the store unchanged; an interrupted capture never leaves a partial file. Review history survives closing the app and restarting the computer.
 
 ### NFR-004 — Readable without the app
-With arch-mind uninstalled, every concept's SEE-I, relations, sources and recall questions remain readable in a plain text editor.
+With arch-mind uninstalled, every concept's SEE-I, relations, sources and recall questions remain readable in a plain text editor. Pictograms and visual illustrations add to the text and never replace it: a concept is complete without them.
 
 ### NFR-005 — Local only
 arch-mind and its capture tool accept no connections from other devices. Acceptance: from another device on the same network, no arch-mind port answers.
@@ -210,9 +240,11 @@ With 300 concepts and 600 recall questions, the review screen shows the due ques
 - BR-005 — Every saved concept has a complete SEE-I, each part approved by the author, and at least one confirmed recall question.
 - BR-006 — Each recall question is in exactly one Leitner box and has one due date.
 - BR-007 — Review history is append-only: past reviews are never rewritten.
+- BR-008 — A concept has at most one pictogram and at most one visual illustration; the pictogram comes from the pictogram library.
 
 ## 10. Product / UX Principles
-- UX-001 — Views look like arch-mind's own design, with layers as stacked bands; generic diagram styling is not acceptable for the layer view.
+- UX-001 — Views look like arch-mind's own design, with layers as stacked plates; generic diagram styling is not acceptable for the layer view.
+- UX-004 — Pictograms and illustrations allude to the real thing a layer or concept is, and never carry meaning alone: each is shown with the name or text it stands for.
 - UX-002 — The review screen never shows the answer before the author has tried to recall it.
 - UX-003 — Any rejection names the exact field or relation and what is missing.
 
@@ -231,9 +263,14 @@ With 300 concepts and 600 recall questions, the review screen shows the due ques
 - FR-025 — Concept detail.
 - FR-026 to FR-032 — Leitner review with history.
 
+### Phase 2 — Illustrated, responsive study
+- FR-034 to FR-036 — Pictogram and visual illustration proposed at capture and confirmed by the author.
+- FR-019, FR-024, FR-025 as amended, FR-037 to FR-042 — Layer plates with pictograms, a selection that brings the neighbourhood forward, navigable relations and zoom to fit.
+- BR-008, UX-001 as amended, UX-004.
+
 ### Out
 - Phone or network access.
-- Focus view (a concept and its neighbors), static exports, other layouts.
+- A separate view showing only one concept and its neighbors, static exports, other layouts.
 - FSRS or other adaptive scheduling.
 - Editing concepts inside the app (hand edits to files and capture cover changes).
 - Search across concept text.
@@ -247,7 +284,7 @@ With 300 concepts and 600 recall questions, the review screen shows the due ques
 ## 14. Future Product Scope
 - Review from a phone.
 - Adaptive scheduling (FSRS) using the kept review history.
-- Focus view starting from one concept.
+- A separate view showing only one concept and its neighbors.
 - Editing concepts inside the app.
 
 ## 15. Product Decisions
@@ -271,14 +308,21 @@ With 300 concepts and 600 recall questions, the review screen shows the due ques
 | PD-018 | Must the author write the SEE-I alone? | Decided | No. SEE-I is used but not forced on the author: Claude can draft it and the author reviews each part, the same review layer as relations and layers | author | 2026-10-30 | «I see the author writing the concept as SEE-I as useful but not forced; it can be together with the AI, or a review layer like the relations and layers» (translated) | FR-005, FR-033, BR-005, J-001 |
 | PD-019 | Are the proposed numeric targets accepted? | Decided | NFR-006 (review screen within 2 s at 300 concepts / 600 questions) and SC-001 to SC-003 as written | author | 2026-10-30 | «Accept them» | NFR-006, SC-001, SC-002, SC-003 |
 | PD-020 | What happens after a wrong answer in review? | Decided | The app offers the concept's detail, which lists every relation with its source and explanation; no concept-and-neighbors view in the MVP | author | 2026-10-30 | «Open the detail (Recommended)» (translated) | FR-031, J-003, `docs/design/ux/review-flow.mmd` |
+| PD-021 | What does the second phase of the study screen become? | Decided | Combine stacked layer plates with a relation drawer, and add illustrative visual representations | author | 2026-11-01 | «creo que el 2 y 3 pueden ir de la mano, sumado a que faltaria la parte como iconos, representaciones visuales ilustrativas» (verbatim, Spanish) | J-002, CAP-003, CAP-004, FR-019, FR-024, FR-037 to FR-042, G-005 |
+| PD-022 | Where do illustrative pictures appear? | Decided | Pictograms for layers and concepts, plus a SEE-I visual illustration only where it applies | author | 2026-11-01 | «capa + cocnepto e ilustracion see - i unicamente dodne aplica yo se que no en todo aplica» (verbatim, Spanish) | FR-034 to FR-038, FR-025, BR-008 |
+| PD-023 | Which visual style for pictograms? | Decided | Isometric mini-objects | author | 2026-11-01 | «Isometric mini-objects (Recommended)» | UX-004, `DESIGN.md` |
+| PD-024 | Who chooses a concept's pictogram? | Decided | Claude proposes it at capture from a fixed library and the author confirms | author | 2026-11-01 | «Claude proposes at capture (Recommended)» | FR-034, FR-036, BR-004, BR-008 |
+| PD-025 | Who creates the SEE-I visual illustration? | Decided | Claude proposes it at capture only when the illustration part is drawable; the author accepts, asks again or declines | author | 2026-11-01 | «Claude proposes, you confirm (Recommended)» | FR-035, FR-036, BR-004 |
+| PD-026 | What happens when no library pictogram fits a concept? | Decided | The concept is shown with its layer's pictogram; a capture is never blocked for it | author | 2026-11-01 | «Use the layer pictogram (Recommended)» | FR-034, FR-038 |
+| PD-027 | Do the layer plates replace the flat layer view? | Decided | Yes: plates, matrix and review; the flat layer view is retired | author | 2026-11-01 | «Plates replace it (Recommended)» | FR-019, UX-001, `docs/design/architecture/adr/ADR-006-layer-view-layout.md` |
 | PD-016 | Leitner box count and intervals | Open | Discovery used 5 boxes of 1, 3, 7, 16 and 35 days as an example, not a researched value. Authority: author | — | — | — | FR-028, FR-029 |
 | PD-017 | Who maintains the facet lists (layers are fixed; domains and concerns)? | Open | Whether the author can add domains and concerns during capture or only in a settings file. Authority: author | — | — | — | FR-006 |
 
 ## 16. Product Traceability
 | Capability / Journey | Requirements |
 |---|---|
-| CAP-001 / J-001 | FR-001 to FR-014, FR-033, NFR-002, NFR-003, BR-001, BR-002, BR-004, BR-005 |
+| CAP-001 / J-001 | FR-001 to FR-014, FR-033, FR-034 to FR-036, NFR-002, NFR-003, BR-001, BR-002, BR-004, BR-005, BR-008 |
 | CAP-002 | FR-015 to FR-017, NFR-003, NFR-004, BR-002 |
-| CAP-003 / J-002 | FR-018 to FR-024, NFR-001, UX-001 |
-| CAP-004 / J-002, J-003 | FR-025, FR-031 |
+| CAP-003 / J-002 | FR-018 to FR-024, FR-037 to FR-042, NFR-001, UX-001, UX-004 |
+| CAP-004 / J-002, J-003 | FR-025, FR-031, FR-040 |
 | CAP-005 / J-003 | FR-026 to FR-032, NFR-006, BR-006, BR-007, UX-002 |

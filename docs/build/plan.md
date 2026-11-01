@@ -1,6 +1,6 @@
 # arch-mind Build Plan
 
-Baseline: RV-001
+Baseline: RV-002 (M01 to M04 were planned and built against RV-001; Phase 2 milestones M05 to M07 plan against RV-002)
 Change folders: docs/changes/; milestone folders are named YYYY-MM-DD-Mxx-<slug>
 
 Milestone status (no status is stored in this plan):
@@ -19,6 +19,8 @@ Four vertical slices, each usable on its own. The riskiest assumptions are prove
 
 M02 and M03 then grow capture and views independently; M04 adds review on top of the concept detail from M03.
 
+Phase 2 (PRD §12) adds three slices. M05 proves the riskiest Phase 2 assumption first: the own SVG plates renderer (ADR-008) draws the TST-032 chain at the reference width with a Fit scale of at least 0.85, with pictograms from the library and the layer pictogram as fallback. M06 then makes the map respond to selection with the relation drawer, which answers the P0 finding of the 2026-11-01 UX critique. M07 adds the pictogram and illustration proposals to capture (ADR-009). Order M06 before M07: author, 2026-11-01, «Selection first (Recommended)».
+
 ## Architecture Proof Slice
 Milestone: M01
 Why this is the smallest useful end-to-end proof:
@@ -32,7 +34,12 @@ graph LR
   M01 --> M02
   M01 --> M03
   M03 --> M04
+  M04 --> M05
+  M05 --> M06
+  M05 --> M07
+  M06 --> M07
 ```
+M07 depends on M05 for the pictogram catalog and on M06 for the drawer that shows the illustration.
 
 ## Milestone M01 — A concept captured from Claude Code appears in the layer view
 
@@ -254,6 +261,155 @@ Stop if:
 - F-005 is still open when the scheduler compares dates: the day-boundary rule (local time zone, due date ≤ today) must first be stated in `domain.md` through this milestone's change folder;
 - F-004 is still open when assigning recall ids after hand edits: either record the limitation as accepted or name the prevention rule in the design first.
 
+## Milestone M05 — Layer plates with pictograms
+
+Goal:
+At 1366 × 768 the layer view shows the four layers as stacked isometric plates, each with its layer pictogram, and every matching concept as its pictogram (its own, or its layer's when it has none or an unknown id) with designator and short title, typed wires between them, zoom in and Fit; the TST-032 chain fits at a Fit scale of at least 0.85, and a view that would need less is refused with the narrower-filters message.
+
+Requirements:
+- FR-019 (as amended), FR-020, FR-023, FR-037, FR-038, FR-042
+- NFR-001
+- BR-008 (read side)
+
+Canonical authorities:
+- `docs/design/architecture/adr/ADR-008-layer-plates-renderer.md` (base sizes, Fit scale, 0.85 floor)
+- `docs/design/architecture/adr/ADR-009-pictogram-and-illustration-storage.md` (pictogram field, catalog, load rules)
+- `docs/design/data/concept.schema.json` (`pictogram`)
+- `docs/design/api/openapi.yaml` (`Concept.pictogram`)
+- `docs/design/architecture/quality-attributes.md` (NFR-001 row; rules "No React Flow in the UI", catalog and artwork)
+- `DESIGN.md`, PRD UX-001, UX-004
+
+Prerequisites:
+- M04
+
+Expected create/edit areas (proposed):
+- rules module: pictogram catalog (ids and meanings, four layer ids) and pictogram load rules;
+- Study UI: plates renderer replacing the React Flow layer view; pictogram artwork asset, seeded from the isometric set in the reviewed mock;
+- `DESIGN.md` re-documented at the end with the plates and pictogram rules.
+
+Acceptance:
+- AC-024 — Plates stack in the order client, network, server, data; each concept sits on its layer's plate; each relation is a directed wire labeled with its type (FR-019, FR-020).
+- AC-025 — Each layer shows its pictogram; a concept with a catalog pictogram shows it; a concept with none, or with an id not in the catalog, shows its layer's pictogram, and the unknown id is listed in the file problems (FR-037, FR-038, ADR-009).
+- AC-026 — At 1366 × 768 the TST-032 chain renders at Fit with scale ≥ 0.85, no horizontal scrolling, labels ≥ 11 px and pictograms ≥ 32 px on screen; a fixture needing a Fit scale below 0.85 shows the narrower-filters message (NFR-001, FR-023, ADR-008).
+- AC-027 — The author can zoom in and return to Fit (FR-042).
+- AC-028 — Every pictogram is shown with the name it stands for and has a text alternative (UX-004).
+
+Tests:
+- TST-021 — Rules: catalog contents (four layer ids) and pictogram load rules, including an unknown id reported in problems (AC-025).
+- TST-022 — Layout and projection unit tests: plate order, placement, Fit scale formula and the 0.85 refusal (AC-024, AC-026).
+- TST-023 — End-to-end at 1366 × 768, light and dark: TST-032 at Fit with measured scale, no horizontal scroll, label and pictogram sizes; over-wide fixture refused; zoom and Fit (AC-026, AC-027, AC-028). Replaces the React Flow based TST-008 and TST-014 assertions.
+- TST-024 — Architecture rule "No React Flow in the UI": `@xyflow/react` is not a UI dependency.
+- TST-025 — Architecture rule "catalog and artwork": catalog ids and artwork names are the same set and include the four layer ids.
+
+Quality gates:
+- type check, lint, tests pass; package check passes.
+
+Completion evidence:
+- TST-021 to TST-025 output; measured Fit scale for TST-032; screenshots light and dark.
+
+Stop if:
+- the TST-032 Fit scale is below 0.85 at 1366 px (ADR-008 revisit trigger: report the measurement);
+- implementation requires changing a frozen product behavior or an accepted ADR;
+- required scope expands beyond this milestone.
+
+## Milestone M06 — Selection and the relation drawer
+
+Goal:
+Selecting a concept marks it, keeps its relations and the concepts they connect prominent and makes the rest recede; a drawer beside the view, without hiding the selection, shows the concept's pictogram, SEE-I, episode, facets, review state and its incoming and outgoing relations as source → type → target with source and explanation; choosing the other end selects it; clearing the selection restores the view.
+
+Requirements:
+- FR-021, FR-024 (as amended), FR-025 (as amended, without the illustration), FR-039, FR-040, FR-041
+
+Canonical authorities:
+- `docs/design/domain.md` (Selection / neighbourhood)
+- `docs/design/architecture/adr/ADR-008-layer-plates-renderer.md` (selection on SVG elements, accessible list alternative)
+- `docs/design/architecture/architecture.dsl` (StudyUI selection and drawer)
+- `docs/design/api/openapi.yaml` (`GET /api/concepts/{id}`)
+- PRD UX-004; PRODUCT.md accessibility baseline
+
+Prerequisites:
+- M05
+
+Expected create/edit areas (proposed):
+- Study UI: selection state, receding of non-neighbours, relation drawer, accessible list of concepts and relations.
+
+Acceptance:
+- AC-029 — Selecting a concept marks it; its incoming and outgoing relations and the concepts they connect stay prominent; every other concept and relation recedes but stays identifiable (FR-039).
+- AC-030 — The drawer opens beside the view without hiding the selected concept and shows pictogram, SEE-I, episode, facets, review state, and incoming and outgoing relations with source and explanation (FR-024, FR-025, FR-040).
+- AC-031 — Choosing the other end of a listed relation selects that concept (FR-040).
+- AC-032 — Clearing the selection (Escape or the close control) restores full prominence and returns focus to where it was (FR-041).
+- AC-033 — Every concept and relation is reachable and operable by keyboard, through the plates or the accessible list, with visible focus; active text meets WCAG 2.2 AA.
+
+Tests:
+- TST-026 — Neighbourhood unit tests: incoming and outgoing relations and connected concepts for a selection, including self-free and cross-layer cases (AC-029, AC-031).
+- TST-027 — End-to-end: select, drawer contents, navigate by the other end, clear (AC-029 to AC-032).
+- TST-028 — End-to-end keyboard path and accessible list (AC-033).
+
+Quality gates:
+- type check, lint, tests pass; package check passes.
+
+Completion evidence:
+- TST-026 to TST-028 output; screenshots of a selection with the drawer, light and dark.
+
+Stop if:
+- implementation requires changing a frozen product behavior or an accepted ADR;
+- required scope expands beyond this milestone.
+
+## Milestone M07 — Capture proposes a pictogram and an illustration
+
+Goal:
+In a Claude Code capture, Claude proposes a pictogram from the catalog and, when the illustration part describes a drawable scene, a visual illustration that the author sees in a browser preview; only what the author accepts is saved; an existing concept without them can gain them; the drawer shows the illustration.
+
+Requirements:
+- FR-025 (illustration), FR-034, FR-035, FR-036
+- NFR-002, NFR-003, NFR-004
+- BR-004, BR-008
+
+Canonical authorities:
+- `docs/design/api/capture-tools.schema.json` (`list_concepts` catalog, `save_concept` and `extend_concept` pictogram and illustration, `preview_illustration`, rejections)
+- `docs/design/architecture/adr/ADR-009-pictogram-and-illustration-storage.md` and its addendum (the Decision's load rules govern: a concept with an unknown pictogram id and no illustration link still accepts an illustration)
+- `docs/design/api/openapi.yaml` (`GET /api/concepts/{id}/illustration`, link stripped from `seeI.illustration`)
+- `docs/design/ux/flows.mmd`
+- `docs/design/architecture/quality-attributes.md` (threat rows; NFR-002 row; illustration rules)
+
+Prerequisites:
+- M05, M06
+
+Expected create/edit areas (proposed):
+- rules module: SVG allowlist validator, illustration link rules;
+- capture server: pictogram catalog in `list_concepts`, pictogram and illustration on save and extend, `preview_illustration`, illustration file writer;
+- capture skill instructions: pictogram and conditional illustration proposals;
+- local server: illustration endpoint and link stripping; Study UI: illustration in the drawer.
+
+Acceptance:
+- AC-034 — A capture saves a pictogram and an illustration only when the author accepted them; an id outside the catalog is rejected as `unknown_pictogram`, an SVG outside the allowlist as `invalid_illustration`; no illustration is proposed when the illustration part is not drawable (FR-034, FR-035, BR-004).
+- AC-035 — `preview_illustration` validates the SVG, opens a temporary page outside the store that shows it only as an image, writes nothing into the store, and works with the app closed (FR-035, FR-013).
+- AC-036 — `extend_concept` adds a pictogram or illustration to a concept that has none and answers `already_present` when it has one, including a broken illustration link (FR-036, ADR-009).
+- AC-037 — The illustration file is written before the concept file; interrupting between the two leaves no concept pointing to a missing file (NFR-003).
+- AC-038 — A hand-edited concept with more than one illustration link, or a link to a missing or invalid SVG, loads without its illustration and is listed in the file problems (BR-008, ADR-009).
+- AC-039 — `GET /api/concepts/{id}/illustration` serves a valid illustration with the restrictive Content-Security-Policy and `nosniff`, and 404 otherwise; `seeI.illustration` reaches the UI without the link; the drawer shows the illustration only as an image (FR-025, ADR-009).
+- AC-040 — Over 5 real captures that include a pictogram proposal and an illustration proposal with one preview, the tool adds at most 60 seconds of waiting and at most 2 confirmation prompts per capture, with `preview_illustration` pre-allowed like `save_concept` (NFR-002).
+- AC-041 — A saved concept with an illustration stays readable in a plain text editor, and a Markdown viewer shows the illustration from its link (NFR-004).
+
+Tests:
+- TST-029 — Rules: SVG allowlist at save and at load (script, event handlers, external references, `foreignObject`, DOCTYPE or entities, over 200,000 characters) (AC-034, AC-038).
+- TST-030 — Capture contract tests for `list_concepts`, `save_concept`, `extend_concept` and `preview_illustration`, including every new rejection (AC-034 to AC-036).
+- TST-031 — Architecture rule "illustration writer order": a test kills the writer between the two writes and finds no concept pointing to a missing file; the local server has no write path to `illustrations/` (AC-037).
+- TST-033 — Illustration endpoint headers, 404 cases and link stripping (AC-039). (TST-032 is skipped: it names the discovery fixture.)
+- TST-034 — Architecture rule "illustrations only as images": the UI has no code path that injects SVG text into the DOM (AC-039).
+- TST-035 — Recorded capture walk-through: proposals accepted, re-asked and declined; the saved file contains only what was accepted (AC-034, AC-041).
+
+Quality gates:
+- type check, lint, tests pass; package check passes.
+
+Completion evidence:
+- TST-029 to TST-035 output; a timing log of the 5 captures for AC-040.
+
+Stop if:
+- until the author confirms the 5 timed captures for AC-040 in a signed-in Claude Code session (human task);
+- implementation requires changing a frozen product behavior or an accepted ADR;
+- required scope expands beyond this milestone.
+
 ## Requirement Coverage Matrix
 | Requirement | Milestone(s) | Acceptance | Tests |
 |---|---|---|---|
@@ -276,13 +432,13 @@ Stop if:
 | FR-016 | M03 | AC-017 | TST-015 |
 | FR-017 | M03 | AC-017 | TST-015 |
 | FR-018 | M03 | AC-012 | TST-012 |
-| FR-019 | M01 | AC-004 | TST-008 |
-| FR-020 | M01 | AC-004 | TST-008 |
-| FR-021 | M03 | AC-014 | TST-013 |
+| FR-019 | M01, M05 | AC-004, AC-024 | TST-008, TST-022, TST-023 |
+| FR-020 | M01, M05 | AC-004, AC-024 | TST-008, TST-022 |
+| FR-021 | M03, M06 | AC-014, AC-030 | TST-013, TST-027 |
 | FR-022 | M03 | AC-013 | TST-013 |
-| FR-023 | M03 | AC-015 | TST-014 |
-| FR-024 | M03 | AC-016 | TST-015 |
-| FR-025 | M03 | AC-016 | TST-015 |
+| FR-023 | M03, M05 | AC-015, AC-026 | TST-014, TST-022, TST-023 |
+| FR-024 | M03, M06 | AC-016, AC-030 | TST-015, TST-027 |
+| FR-025 | M03, M06, M07 | AC-016, AC-030, AC-039 | TST-015, TST-027, TST-033 |
 | FR-026 | M04 | AC-018 | TST-018 |
 | FR-027 | M04 | AC-019 | TST-020 |
 | FR-028 | M04 | AC-020 | TST-016 |
@@ -290,20 +446,30 @@ Stop if:
 | FR-030 | M04 | AC-020 | TST-016 |
 | FR-031 | M04 | AC-021 | TST-020 |
 | FR-032 | M04 | AC-022 | TST-017 |
-| NFR-001 | M01, M03 | AC-005, AC-015 | TST-008, TST-014 |
-| NFR-002 | M02 | AC-011 | timing log |
-| NFR-003 | M01 | AC-001 | TST-004 |
-| NFR-004 | M01 | AC-007 | TST-001 |
+| FR-034 | M07 | AC-034 | TST-030, TST-035 |
+| FR-035 | M07 | AC-034, AC-035 | TST-030, TST-035 |
+| FR-036 | M07 | AC-036 | TST-030 |
+| FR-037 | M05 | AC-025 | TST-021, TST-025 |
+| FR-038 | M05 | AC-025 | TST-021, TST-023 |
+| FR-039 | M06 | AC-029 | TST-026, TST-027 |
+| FR-040 | M06 | AC-030, AC-031 | TST-026, TST-027 |
+| FR-041 | M06 | AC-032 | TST-027 |
+| FR-042 | M05 | AC-027 | TST-023 |
+| NFR-001 | M01, M03, M05 | AC-005, AC-015, AC-026 | TST-008, TST-014, TST-023 |
+| NFR-002 | M02, M07 | AC-011, AC-040 | timing log |
+| NFR-003 | M01, M07 | AC-001, AC-037 | TST-004, TST-031 |
+| NFR-004 | M01, M07 | AC-007, AC-041 | TST-001, TST-035 |
 | NFR-005 | M01 | AC-006 | TST-007 |
 | NFR-006 | M04 | AC-023 | TST-019 |
 | BR-001 | M01 | AC-002 | TST-002 |
 | BR-002 | M01 | AC-002 | TST-002 |
 | BR-003 | M01 | AC-002 | TST-002 |
-| BR-004 | M02 | AC-008, AC-009 | TST-011 |
+| BR-004 | M02, M07 | AC-008, AC-009, AC-034 | TST-011, TST-035 |
 | BR-005 | M01 | AC-002 | TST-002 |
 | BR-006 | M04 | AC-020 | TST-016 |
 | BR-007 | M04 | AC-022 | TST-017 |
+| BR-008 | M05, M07 | AC-025, AC-038 | TST-021, TST-029 |
 
 ## Deferred Scope
-- Everything in PRD §12 Out and §14 Future Product Scope: phone or network access, focus view, FSRS, editing concepts inside the app, search.
+- Everything in PRD §12 Out and §14 Future Product Scope: phone or network access, a separate view showing only one concept and its neighbors, FSRS, editing concepts inside the app, search.
 - MINOR and NOTE findings F-007, F-008 and F-009 from `docs/design/review.md`, unless a milestone touches their artifact and the fix is one line.

@@ -16,7 +16,11 @@ paths:
   /api/concepts:
     get:
       summary: All valid concepts plus files that could not be read
-      description: Reloads the store folder so hand edits appear (FR-016, FR-017).
+      description: >
+        Reloads the store folder so hand edits appear (FR-016, FR-017). A concept whose
+        illustration link or SVG is invalid, has more than one illustration link, or names an
+        unknown pictogram is still returned (without its illustration, or with its layer's
+        pictogram) and the file is also listed in problems (ADR-009).
       operationId: listConcepts
       responses:
         "200":
@@ -58,6 +62,35 @@ paths:
                     items: { $ref: "#/components/schemas/QuestionState" }
         "404":
           description: No such concept
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/concepts/{id}/illustration:
+    get:
+      summary: The concept's visual illustration as an SVG image
+      description: >
+        Served as a file, not inside the concept payload, so the UI can show it only as an
+        image (img) and never inline it. The SVG was validated against the allowlist by the
+        rules module (ADR-009); the headers below are a second barrier if the URL is opened
+        directly.
+      operationId: getConceptIllustration
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, pattern: "^[a-z0-9]+(-[a-z0-9]+)*$" }
+      responses:
+        "200":
+          description: The illustration (FR-025)
+          headers:
+            Content-Security-Policy:
+              description: Blocks scripts, external loads and framing of the SVG.
+              schema: { type: string, const: "default-src 'none'; style-src 'unsafe-inline'; sandbox" }
+            X-Content-Type-Options:
+              schema: { type: string, const: nosniff }
+          content:
+            image/svg+xml:
+              schema: { type: string }
+        "404":
+          description: No such concept, or the concept has no valid illustration
         "403": { $ref: "#/components/responses/Forbidden" }
   /api/facets:
     get:
@@ -126,8 +159,19 @@ components:
       description: Foreign Host or Origin (ADR-005)
   schemas:
     Concept:
-      description: Shape defined in docs/design/data/concept.schema.json.
+      description: >
+        Shape defined in docs/design/data/concept.schema.json, including the optional
+        pictogram id (the UI shows the layer's pictogram when it is absent or no longer in
+        the library, FR-038), plus the derived hasIllustration flag. seeI.illustration is
+        returned without the Markdown image link (stripped server-side); the UI shows the
+        image only through GET /api/concepts/{id}/illustration (ADR-009).
       type: object
+      required: [hasIllustration]
+      properties:
+        pictogram: { type: string, pattern: "^[a-z0-9]+(-[a-z0-9]+)*$" }
+        hasIllustration:
+          type: boolean
+          description: Derived by the rules module; not stored. True when GET /api/concepts/{id}/illustration answers 200.
     FileProblem:
       type: object
       required: [file, reason]

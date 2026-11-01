@@ -4,6 +4,7 @@ Status: Accepted
 Date: 2026-10-30
 Decision owners: author
 Accepted by: author, 2026-10-30, «I accept A (Recommended)» (translated)
+Partially superseded by: ADR-008 (layer view drawing)
 Related: CON-001, UX-001, UX-002, UX-003, NFR-001
 Reversibility: two-way — components are copied into the repository and styled with utility classes; replacing them means restyling the Study UI, not touching data, contracts or servers.
 

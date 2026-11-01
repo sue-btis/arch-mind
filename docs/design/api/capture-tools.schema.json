@@ -2,11 +2,18 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "arch-mind/capture-tools.schema.json",
   "title": "Capture server MCP tools",
-  "description": "Contract of the four MCP tools of the capture server (ADR-003). Each entry under $defs.tools gives the tool's inputSchema, published in tools/list, and its outputSchema, the shape of structuredContent on success. outputSchema is not published in tools/list: MCP clients validate structuredContent against it even on error results, which would hide the rejection (UX-003). A failed call returns an MCP tool result with isError true and structuredContent matching $defs.rejection (FR-009 to FR-011, UX-003). Relation, episode and SEE-I shapes come from docs/design/data/concept.schema.json.",
+  "description": "Contract of the five MCP tools of the capture server (ADR-003, ADR-009). Each entry under $defs.tools gives the tool's inputSchema, published in tools/list, and its outputSchema, the shape of structuredContent on success. outputSchema is not published in tools/list: MCP clients validate structuredContent against it even on error results, which would hide the rejection (UX-003). A failed call returns an MCP tool result with isError true and structuredContent matching $defs.rejection (FR-009 to FR-011, UX-003). Relation, episode and SEE-I shapes come from docs/design/data/concept.schema.json. A pictogram is a library id and a visual illustration is SVG text (ADR-009); the rules module rejects an unknown pictogram, an illustration outside the SVG allowlist and a second pictogram or illustration on a concept that has one (FR-034 to FR-036, BR-008). preview_illustration shows a proposed illustration to the author before acceptance and never writes into the store. The server writes the illustration file before the concept file and links it from the Illustration part, so an interrupted save never leaves a concept pointing to a missing file.",
   "$defs": {
     "conceptId": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
     "relation": { "$ref": "concept.schema.json#/properties/relations/items" },
     "episode": { "$ref": "concept.schema.json#/properties/episodes/items" },
+    "pictogramId": { "$ref": "concept.schema.json#/properties/pictogram" },
+    "illustrationSvg": {
+      "description": "SVG text of the visual illustration the author accepted (FR-035, PD-025). Untrusted: validated against an element and attribute allowlist (no script, event handlers, external references, foreignObject, DOCTYPE or entity declarations; at most 200,000 characters). The server writes it to illustrations/<concept id>.svg and appends one Markdown image link to the concept's Illustration part; callers never send the file name or the link.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200000
+    },
     "newRecall": {
       "description": "A recall question the author confirmed. The server assigns its id and its confirmed date; callers never send them.",
       "type": "object",
@@ -30,6 +37,7 @@
       "properties": {
         "id": { "$ref": "#/$defs/conceptId" },
         "file": { "type": "string", "description": "Path of the written concept file." },
+        "illustrationFile": { "type": "string", "description": "Path of the written illustration file; present only when this call added one." },
         "recall": { "type": "array", "items": { "$ref": "#/$defs/savedRecall" }, "description": "Only the questions added by this call." }
       }
     },
@@ -48,7 +56,7 @@
             "required": ["path", "rule", "message"],
             "properties": {
               "path": { "type": "string", "description": "JSON Pointer, e.g. /relations/0/source." },
-              "rule": { "enum": ["missing_source", "missing_target", "duplicate_id", "duplicate_relation", "unknown_concept", "unknown_facet", "incomplete_see_i", "no_recall", "nothing_to_add", "invalid_shape"] },
+              "rule": { "enum": ["missing_source", "missing_target", "duplicate_id", "duplicate_relation", "unknown_concept", "unknown_facet", "unknown_pictogram", "invalid_illustration", "already_present", "incomplete_see_i", "no_recall", "nothing_to_add", "invalid_shape"] },
               "message": { "type": "string" }
             }
           }
@@ -57,22 +65,24 @@
     },
     "tools": {
       "list_concepts": {
-        "description": "Existing concepts and facet values, so Claude can propose relation targets and facets (FR-002, FR-006).",
+        "description": "Existing concepts, facet values and the pictogram catalog, so Claude can propose relation targets, facets and a pictogram (FR-002, FR-006, FR-034).",
         "inputSchema": { "type": "object", "additionalProperties": false, "properties": {} },
         "outputSchema": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["concepts", "facets"],
+          "required": ["concepts", "facets", "pictograms"],
           "properties": {
             "concepts": {
               "type": "array",
               "items": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["id", "title", "layer", "domains", "concerns"],
+                "required": ["id", "title", "layer", "domains", "concerns", "hasIllustration"],
                 "properties": {
                   "id": { "$ref": "#/$defs/conceptId" },
                   "title": { "type": "string" },
+                  "pictogram": { "$ref": "#/$defs/pictogramId" },
+                  "hasIllustration": { "type": "boolean", "description": "True only when the concept has exactly one link to a valid illustration. Lets a capture know whether extend_concept may add an illustration (FR-036); a concept whose link is broken is reported false here, yet extend_concept still answers already_present (ADR-009)." },
                   "layer": { "enum": ["client", "network", "server", "data"] },
                   "domains": { "type": "array", "items": { "type": "string" } },
                   "concerns": { "type": "array", "items": { "type": "string" } }
@@ -87,9 +97,44 @@
                 "domains": { "type": "array", "items": { "type": "string" } },
                 "concerns": { "type": "array", "items": { "type": "string" } }
               }
+            },
+            "pictograms": {
+              "description": "The pictogram library as ids with a one-line meaning, including the four layer pictograms (ADR-009). A concept's pictogram must be one of these ids.",
+              "type": "array",
+              "minItems": 4,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "meaning"],
+                "properties": {
+                  "id": { "$ref": "#/$defs/pictogramId" },
+                  "meaning": { "type": "string", "minLength": 1 }
+                }
+              }
             }
           }
         }
+      },
+      "preview_illustration": {
+        "description": "Shows a proposed illustration to the author before they accept it (FR-035, BR-004, PD-025). Validates the SVG with the same rules-module validator as save, writes a temporary HTML page in the operating system's temp folder that shows the SVG only as an image (an img element pointing at the validated SVG file next to the page, no inline SVG), opens the page with the operating system's default browser and returns the page path. Never writes into the store; works with the app closed (FR-013). The temporary files are not tracked or cleaned up by the server.",
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "illustration"],
+          "properties": {
+            "id": { "$ref": "#/$defs/conceptId" },
+            "illustration": { "$ref": "#/$defs/illustrationSvg" }
+          }
+        },
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["previewPage"],
+          "properties": {
+            "previewPage": { "type": "string", "description": "Absolute path of the temporary HTML page, outside the store." }
+          }
+        },
+        "rejections": ["invalid_illustration", "invalid_shape"]
       },
       "get_concept": {
         "description": "One stored concept, so a capture can extend it without duplicating what exists (FR-012).",
@@ -98,7 +143,7 @@
         "rejections": ["unknown_concept"]
       },
       "save_concept": {
-        "description": "Creates a new concept from what the author confirmed. Rejects without writing when any rule fails (FR-009 to FR-011, BR-001 to BR-005).",
+        "description": "Creates a new concept from what the author confirmed. Rejects without writing when any rule fails (FR-009 to FR-011, FR-034, FR-035, BR-001 to BR-005, BR-008).",
         "inputSchema": {
           "type": "object",
           "additionalProperties": false,
@@ -107,6 +152,8 @@
             "id": { "$ref": "#/$defs/conceptId" },
             "title": { "type": "string", "minLength": 1 },
             "layer": { "enum": ["client", "network", "server", "data"] },
+            "pictogram": { "$ref": "#/$defs/pictogramId" },
+            "illustration": { "$ref": "#/$defs/illustrationSvg" },
             "domains": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
             "concerns": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
             "seeI": { "$ref": "concept.schema.json#/properties/seeI" },
@@ -116,11 +163,11 @@
           }
         },
         "outputSchema": { "$ref": "#/$defs/saveResult" },
-        "rejections": ["missing_source", "missing_target", "duplicate_id", "duplicate_relation", "unknown_facet", "incomplete_see_i", "no_recall", "invalid_shape"],
-        "assigns": "Recall ids q1, q2, ... in input order; confirmed = the author's local date at save."
+        "rejections": ["missing_source", "missing_target", "duplicate_id", "duplicate_relation", "unknown_facet", "unknown_pictogram", "invalid_illustration", "incomplete_see_i", "no_recall", "invalid_shape"],
+        "assigns": "Recall ids q1, q2, ... in input order; confirmed = the author's local date at save. When illustration is sent, the SVG is written first and the concept file second, with the image link appended to the Illustration part."
       },
       "extend_concept": {
-        "description": "Adds relations, recall questions or episodes to an existing concept under the same rules (FR-012). Additive only: never changes or removes stored fields; identity, title, facets and SEE-I change only by hand edit.",
+        "description": "Adds relations, recall questions, episodes, a pictogram or a visual illustration to an existing concept under the same rules (FR-012, FR-036). Additive only: never changes or removes stored fields; identity, title, facets and SEE-I text change only by hand edit. A pictogram or illustration is accepted only when the concept has none (BR-008); otherwise the call is rejected as already_present. A concept that already has an illustration link, even a broken one, counts as having one: the author repairs it by hand. Adding an illustration appends its image link to the Illustration part and changes nothing else in the SEE-I.",
         "inputSchema": {
           "type": "object",
           "additionalProperties": false,
@@ -128,13 +175,15 @@
           "minProperties": 2,
           "properties": {
             "id": { "$ref": "#/$defs/conceptId" },
+            "pictogram": { "$ref": "#/$defs/pictogramId" },
+            "illustration": { "$ref": "#/$defs/illustrationSvg" },
             "relations": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/relation" } },
             "episodes": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/episode" } },
             "recall": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/newRecall" } }
           }
         },
         "outputSchema": { "$ref": "#/$defs/saveResult" },
-        "rejections": ["unknown_concept", "missing_source", "missing_target", "duplicate_relation", "nothing_to_add", "invalid_shape"],
+        "rejections": ["unknown_concept", "missing_source", "missing_target", "duplicate_relation", "unknown_pictogram", "invalid_illustration", "already_present", "nothing_to_add", "invalid_shape"],
         "assigns": "New recall ids continue after the highest q-number in the stored file; confirmed = the author's local date at save. A relation whose (type, to) already exists is rejected as duplicate_relation."
       }
     }
