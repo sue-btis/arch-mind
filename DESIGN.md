@@ -75,6 +75,7 @@ rounded:
   control: "8px"
   floating: "12px"
   panel: "16px"
+  sheet: "24px"
 spacing:
   xs: "4px"
   sm: "8px"
@@ -111,13 +112,13 @@ components:
     height: "28px"
     width: "28px"
   filters-island:
-    backgroundColor: "{colors.gray-0}"
+    backgroundColor: "#ffffffd1"
     rounded: "{rounded.panel}"
     padding: "12px"
     width: "200px"
   concept-sheet:
-    backgroundColor: "{colors.gray-0}"
-    rounded: "{rounded.panel}"
+    backgroundColor: "#ffffffd1"
+    rounded: "{rounded.sheet}"
     padding: "16px"
     width: "420px"
   relation-popover:
@@ -149,7 +150,7 @@ components:
 
 Two languages share each screen on purpose. The interface is soft: rounded panels and controls, generous spacing, neutrals from one gray ramp. The board is exact: flat plates in one fixed projection, pictograms drawn on one isometric grid with 1px outlines, wires laid out by elk with a label on every one. The contrast is the identity, not an accident.
 
-Motion explains what changed. When a filter changes, the concepts glide to their new places while the wires, whose routes were recomputed, step aside and come back once the concepts have settled. Sheets, popovers and revealed answers enter briefly and never bounce. All motion uses one ease-out curve; there is no spring. Under reduced motion the glide is dropped and every entrance becomes a plain fade.
+Motion explains what changed, and it moves like something with weight. Every camera move glides on a damped spring that overshoots by under 1% and settles inside 600ms: the zoom buttons and Fit, the framing of a selection, the return when it is cleared. A released drag keeps sliding with decaying inertia. Keyboard focus moves the view at once, so it never lags behind the keys. Selecting a concept lifts it, draws its wires on and lets everything else recede; the view switch thumb, the review card flip, the card's entrance and the islands stepping away in Review use the same spring; the answered card leaves on a plain ease-out so it never overshoots on its way out. When a filter changes, the concepts glide to their new places while the wires, whose routes were recomputed, step aside and come back once the concepts have settled. Sheets, popovers and revealed answers enter briefly. Under reduced motion every camera move is instant, inertia, lift, draw-on, flip and thumb slide are dropped, and every entrance becomes a plain fade.
 
 The interface runs in light and dark mode with equal care; neither is the default. The mode follows the operating system (`prefers-color-scheme`); there is no in-app toggle.
 
@@ -158,9 +159,9 @@ The interface runs in light and dark mode with equal care; neither is the defaul
 - Near-black ink as the only action color in light mode, near-white in dark mode.
 - Meaningful color only inside the board: layer keys on plates, pictogram faces and designators, three wire hues.
 - Inter only; tabular figures only where numbers are compared.
-- Rounded interface, sharp-cornered board; one soft shadow for everything that floats over the canvas, flat plates.
-- The plates shrink to fit down to a floor of 0.85 and are refused below it; zoom moves only in fixed steps of Fit, and the view pans at every zoom.
-- Deferred by the author's decision, not built: bringing a selected concept's neighbourhood forward (M06), concept illustrations (M07), chain tracing, the trace pulse, the pin table and splice dots.
+- Rounded interface, sharp-cornered board; the material shadow for the translucent islands, drawer and review card and the floating shadow for opaque popovers, translucent islands and drawer over a blurred backdrop (opaque under `prefers-reduced-transparency` or without `backdrop-filter`), flat plates.
+- The plates shrink to fit down to a floor of 0.85 and are refused below it; zoom runs continuously from Fit to 3 times Fit with Ctrl or Cmd and the wheel or a trackpad pinch, the buttons step through 1, 1.5, 2 and 3 times, zoom never goes below Fit, and the view pans at every zoom.
+- Deferred by the author's decision, not built: the Ctrl K finder and legend type isolation (a PRD amendment after M06), concept illustrations (M07), chain tracing, the trace pulse, the pin table and splice dots.
 
 ## Colors
 
@@ -187,7 +188,7 @@ A neutral interface from one gray ramp, with hue reserved for the board and for 
 - **Scrollbar** (`{colors.gray-4}`): the only use of step 4 in light mode.
 
 ### Named Rules
-**The Quarantine Rule.** Meaningful color lives only inside the board. Everything outside it is neutral, plus the ink action color for what can be pressed and correction red for what went wrong. The one deliberate exception, chosen by the author, is the wire legend island: its swatches repeat the wire code so the code can be read without hovering a wire. No other color leaves the board.
+**The Quarantine Rule.** Meaningful color lives only inside the board. Everything outside it is neutral, plus the ink action color for what can be pressed and correction red for what went wrong. The one deliberate exception, chosen by the author, is the wire legend island: its swatches repeat the wire code so the code can be read without hovering a wire. The second exception, also the author's, is the layer color in the drawer header: the pictogram, a layer-tinted pill that spells the layer and a 10% header wash identify which layer the concept lives on, the same way a plate does. No other color leaves the board.
 
 **The Double Carrier Rule.** No meaning rides on color alone. Every wire keeps its free-text label, every coded matrix swatch shows its letter code, every plate shows its name, every designator spells its layer initial, and every pictogram's meaning is written out in its tooltip and in the concept list.
 
@@ -219,13 +220,13 @@ Measured contrast for the plates, both modes: all text at or above 4.5:1; the ti
 
 ## Layout
 
-The study screen is one full-window canvas in the canvas gray with a faint dot grid; the page never scrolls. The plates, the matrix and the review card live on it, and the controls float over it as islands 16px from the window edge, each a panel with a hairline and the floating shadow. Top-left: the product name and the view switch (Layers, Matrix, Review). Below it, a 200px filters island holds the facet filters (layers as chips with the layer pictogram and its count, domains, concerns), a clear-filters button when any filter is set and, in the Layers view, the collapsed "Concepts and relations" list; its header button collapses it to a single line. Top-right: the live line of shown counts and, when files failed to parse, a problems disclosure. Bottom-left: the wire legend. Bottom-right, in the Layers view: the zoom group (zoom out, the current percentage, zoom in, Fit).
+The study screen is one full-window canvas in the canvas gray with a faint dot grid; the page never scrolls. The plates, the matrix and the review card live on it, and the controls float over it as islands 16px from the window edge, each a translucent panel (the panel color at 82% over a 24px backdrop blur) with a hairline and the material shadow. In Review the filters, legend and zoom islands fade, shift down and leave the accessibility tree, and return when Review is left. Top-left: the product name and the view switch (Layers, Matrix, Review). Below it, a 200px filters island holds the facet filters (chips with an "All" chip per group, layers with the layer pictogram and its count, domains, concerns), a clear-filters button when any filter is set and, in the Layers view, the collapsed "Concepts and relations" list; its header button collapses it to a single line. Top-right: the live line of shown counts and, when files failed to parse, a problems disclosure. Bottom-left: the wire legend. Bottom-right, in the Layers view: the zoom group (zoom out, the current percentage, zoom in, Fit).
 
-The free area is what no island covers: from the right edge of the filters island (or 16px from the window when it is collapsed) to 16px from the right edge, and from below the top islands to above the legend and zoom islands on the bottom edge. The plates sit in the free area and grow downward, never sideways, so the view pans vertically. The matrix sits in the free area and the review card is centered in it. The concept detail is a 420px sheet fixed to the right edge, 16px from the window, floating over the canvas; while it is open the free area's right edge moves left of it and the view pans just enough to keep the selected concept inside, without refitting.
+The free area is what no island covers: from the right edge of the filters island (or 16px from the window when it is collapsed) to 16px from the right edge, and from below the top islands to above the legend and zoom islands on the bottom edge. The plates sit in the free area and grow downward, never sideways, so the view pans vertically. The matrix sits in the free area and the review card is centered in it. The concept drawer is a 420px sheet fixed to the right edge, 16px from the window, floating over the canvas; while it is open the free area's right edge moves left of it and the camera glides to frame the selected concept and its neighbours inside what is left, never zooming below Fit and never past twice Fit. When the neighbourhood is taller than the free area at Fit it cannot be shown whole, and the selected concept is kept inside instead.
 
 **The Fit Floor Rule.** The plates are drawn at the Fit scale, min(1, free width / projected width), so they never scroll sideways; the free width is the window width less the filters island and the 16px margins, so collapsing or expanding the island refits. Below 0.85, the scale at which 13px labels fall under 11px or 44px pictograms under 32px, the view is refused and replaced by the fit message, which states the scale it would need, the free width and the floor, and asks for narrower filters. The matrix cannot shrink: it is refused by width, stating the needed and available pixels.
 
-Zoom moves only in four steps of Fit: 1, 1.5, 2 and 3 times. Ctrl (or Cmd) with the wheel steps through them around the pointer, and the zoom group steps them around the centre of the free area. The view pans at every zoom, Fit included, by dragging the empty canvas or with the wheel; it is clamped so at least 80px of the scene stays inside the free area. Keyboard focus moving to a concept outside the free area shifts the view just enough to bring it in.
+Zoom runs continuously from Fit to 3 times Fit. Ctrl (or Cmd) with the wheel, or a trackpad pinch, zooms around the pointer; the zoom group steps through 1, 1.5, 2 and 3 times around the centre of the free area, from whatever the current zoom is. It never goes below Fit. The view pans at every zoom, Fit included, by dragging the empty canvas or with the wheel, and a released drag slides on with inertia; it is clamped so at least 80px of the scene stays inside the free area. Keyboard focus moving to a concept outside the free area shifts the view just enough to bring it in. A click on empty canvas clears the selection.
 
 Spacing comes from a 4px step: 4, 8, 12, 16, 20, 24. Filters groups sit 20px apart; panels pad 16px, the review card 24px.
 
@@ -238,15 +239,18 @@ The matrix is a fixed grid: a 220px row header, 32px square cells, 160px column 
 Depth on the board comes from the projection: plates are flat faces sheared into a fixed oblique view and stacked top to bottom, and each pictogram is a small isometric solid whose three faces are shaded from its layer key. The interface has one level of elevation, used by everything that floats over the canvas.
 
 ### Shadow Vocabulary
-- **Floating** (`box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)`): the islands, the concept sheet and the relation popover. Resting panels (review card, matrix, fit message) carry a hairline and no shadow.
+- **Material** (`box-shadow: 0 0 0 0.5px rgb(0 0 0 / 0.06), 0 2px 6px rgb(0 0 0 / 0.05), 0 12px 32px -12px rgb(0 0 0 / 0.22)` in light; `0 0 0 0.5px rgb(255 255 255 / 0.08), 0 12px 32px -10px rgb(0 0 0 / 0.7)` in dark): the islands, the concept drawer and the review card, which are translucent.
+- **Floating** (`box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)`): the opaque popovers (relation tooltip, problems panel). Resting panels (matrix, fit message) carry a hairline and no shadow.
 - **Ground** (a flat ellipse, 38 by 19 units at the pictogram's foot, black at 8% in light and 45% in dark): the only shadow on the board. It seats each pictogram on its plate.
 
 ### Named Rules
-**The Flat Plate Rule.** Plates have no thickness, no shadow and no gradient: a 7% layer tint and a 55% layer-colored edge. The only shadow on the board is each pictogram's own flat ground ellipse; nothing on the board is blurred, lifted or given a drop shadow. A concept stands out by its shaded faces and outline, not by lift.
+**The Flat Plate Rule.** Plates have no thickness, no shadow and no gradient: a 7% layer tint and a 55% layer-colored edge. The only shadow on the board is each pictogram's own flat ground ellipse, with two exceptions: a hovered concept rises 3px, and the selected concept lifts 6px, grows 12%, takes a soft drop shadow and a 16% layer-colored halo, and its label goes to weight 600. Nothing else on the board is blurred, lifted or given a drop shadow. A concept stands out by its shaded faces and outline, and the selection by its lift.
+
+**The Recede Rule.** While a concept is selected, its relations and the concepts they connect stay at full opacity; every other concept, wire, chip and plate (and in the matrix every cell outside the selected row and column) drops to 18%. Receded things stay in the tab order and return to 70% on hover or focus so they can still be read and chosen.
 
 ## Shapes
 
-**The Soft Frame, Hard Board Rule.** Interface panels, controls and inputs use rounded corners: 16px for panels (islands, sheet, review card), 12px for floating and grouping elements (popover, view switch, fit message), 8px for buttons, view segments and zoom buttons. Plates, wires, matrix cells and swatches use sharp corners and 1px lines. A rounded plate or a square button breaks the rule.
+**The Soft Frame, Hard Board Rule.** Interface panels, controls and inputs use rounded corners: 16px for islands, 24px for the drawer and the review card, 12px for floating and grouping elements (popover, view switch, fit message), 8px for buttons, view segments and zoom buttons. Plates, wires, matrix cells and swatches use sharp corners and 1px lines. A rounded plate or a square button breaks the rule.
 
 Plates are parallelograms: rectangles sheared by 0.25 and squashed to 0.38 of their depth. Wires end in a closed arrowhead (9px) in the wire's own color, oriented along the last segment. Hover or keyboard focus thickens a wire from 1px to 2.5px.
 
@@ -258,17 +262,19 @@ Plates are parallelograms: rectangles sheared by 0.25 and squashed to 0.38 of th
 - **Shape:** gently rounded (8px).
 - **Primary:** ink fill with inverse text, 6px by 12px. Used for the forward step of a flow (Show answer, Next).
 - **Secondary:** hairline border, ink text, canvas fill on hover. Used for Right, Wrong, Open concept.
-- **Quiet:** hairline border, muted text turning ink on hover, 4px by 10px. Used for Close and Clear filters.
+- **Quiet:** hairline border, muted text turning ink on hover, 4px by 10px. Used for Clear filters.
+- **Round:** the drawer's Close, a 28px circle with an 8% ink fill and a muted glyph, no border; the fill deepens to 14% on hover.
+- **Press:** every pressable control scales to 95% for 200ms on press; the zoom buttons, list and matrix row and cell buttons, the filters toggle and the disclosure summaries included.
 - **Disabled:** 60% opacity while a request is in flight.
 
 ### View Switch
-- **Style:** a 12px-rounded group on the canvas gray inside the top-left island, 4px inner padding. The active segment is ink-filled with inverse text (8px radius); inactive segments are muted text that turns ink on hover. State is exposed with `aria-pressed`.
+- **Style:** a 12px-rounded group on the canvas gray inside the top-left island, 4px inner padding. A thumb (8px radius, ink fill) slides under the segments on the spring and the active label turns to inverse text; inactive segments are muted text that turns ink on hover. State is exposed with `aria-pressed`.
 
 ### Zoom Group
-- **Style:** in its own bottom-right island, 28px hairline buttons with 8px radius and 13px text (zoom out, zoom in, Fit), canvas fill on hover, muted text when disabled at either end of the steps. Between them the current on-screen scale (Fit scale times zoom step) in muted 13px tabular figures, such as "96 %".
+- **Style:** in its own bottom-right island, 28px hairline buttons with 8px radius and 13px text (zoom out, zoom in, Fit; zoom out is disabled at Fit and zoom in at 3 times), canvas fill on hover, muted text when disabled at either end of the steps. Between them the current on-screen scale (Fit scale times zoom step) in muted 13px tabular figures, such as "96 %".
 
 ### Filters Island
-- **Style:** 200px, 16px radius, hairline border, panel fill, floating shadow, 12px padding; its header button collapses it. Groups are fieldsets with an uppercase label heading and native checkboxes tinted with the action color. Layer rows are 8px-rounded hairline chips with the checkbox, the layer pictogram at 22px, the name and the layer's concept count in muted tabular figures.
+- **Style:** 200px, 16px radius, hairline border, translucent panel material, material shadow, 12px padding; its header button collapses it. Each group is a fieldset with an uppercase label heading and a wrapping row of pill chips: an "All" chip, pressed (ink fill, `aria-pressed`) while nothing in the group is chosen and clearing the group when pressed, then one chip per value, each a `checkbox` named by its value and ink-filled when chosen. Layer chips carry the layer pictogram at 20px and the layer's concept count in tabular figures. Semantics are unchanged: choosing nothing means all.
 
 ### Wire Legend
 A single-row island at the bottom-left: a 20px line sample per code at 2px stroke, the letter code in muted label weight, then the type name; the last item is graphite "any other type" in muted ink.
@@ -298,22 +304,25 @@ A square swatch 16px high and at least 24px wide, centered in its cell. A single
 A 320px tooltip, 12px radius, hairline, floating shadow. It shows the type with from and to, the source and the explanation; several relations stack with hairline separators. It opens below its anchor and flips above when the window would cut it off.
 
 ### Concept Sheet
-A 420px non-modal dialog fixed to the right edge, 16px radius, floating shadow, scrolling internally. It shows the metadata as a two-column definition list, then labeled sections for SEE-I, relations, episodes and recall questions. Escape closes it and focus returns to the concept, list row or matrix row that opened it.
+A 420px non-modal dialog fixed to the right edge, 24px radius, translucent material with the material shadow, scrolling internally. Its header is washed 10% with the layer color and holds the concept's pictogram at 64px, a layer-tinted pill with the designator and the layer, the title and its facets as pills, and a round Close control. Grouped cards follow: SEE-I; relations split into outgoing and incoming, each row giving source, type and target with its source citation and explanation, and activating a row selects the other end, which moves focus to the drawer; episodes; and recall questions with box and due date. Escape, Close or a click on empty canvas clears the selection and focus returns to the concept, list row or matrix row that opened it.
 
 ### Review Card
-A centered card of up to 672px, 16px radius, 24px padding. It shows the question in headline weight; the revealed answer repeats the sheet's SEE-I and relation sections. A wrong mark is the one place correction red appears in a normal flow.
+A centered card of up to 672px, 24px radius, 24px padding, translucent material, with a 4px progress bar above it (answered of due today). It shows the question in headline weight and keeps the answer unrendered until revealed. Space or Enter reveals with a flip; under reduced motion the flip is a fade. After the reveal 1 marks Wrong and 2 marks Right, the buttons show their keys, and focus lands on Right. The answered card leaves up and to the left and the next one rises in. A wrong mark is the one place correction red appears in a normal flow.
 
 ### Motion
 - **Re-place on filter change:** concepts glide to their new positions over 320ms on `cubic-bezier(0.16, 1, 0.3, 1)`. Wires and their chips fade out over 80ms (linear) during the settle and return over 180ms on the same curve.
-- **Entrances:** new concepts fade in over 220ms; the sheet slides 12px in from the right with a fade over 260ms; the popover fades over 120ms; a revealed answer unclips top to bottom over 240ms. All use backwards fill so nothing flashes before it starts.
-- **Reduced motion:** no glide and no wire hiding; the sheet and the answer reveal become plain fades.
+- **Entrances:** new concepts fade in over 220ms; the drawer slides 12px in from the right on the spring over 420ms; the popover fades over 120ms; a revealed answer flips in over 550ms on the spring. All use backwards fill so nothing flashes before it starts.
+- **Camera:** zoom, Fit, framing and the return on clear glide on a damped spring (about 0.6% overshoot, settled inside 600ms). Dragging and the plain wheel follow the pointer with no delay.
+- **Selection:** the lift rises and grows over 420ms on the spring while its drop shadow and the halo fade in over 300ms on the ease-out curve; receding fades over 320ms on the ease-out curve; the wires of the neighbourhood draw on from source to target over 560ms.
+- **Chrome:** the view-switch thumb slides over 380ms; the filters, legend and zoom islands step away in Review over 300ms and 400ms (fade, 8px down, 4% smaller).
+- **Reduced motion:** camera moves are instant and drags do not slide on; the lift, draw-on, flip, thumb slide, press response and islands' step-away are dropped; no wire hiding; the drawer, the review card and the answer reveal become plain fades.
 
 ## Do's and Don'ts
 
 ### Do:
 - **Do** keep every color with meaning inside the board; the wire legend island is the only exception.
-- **Do** give every motion a reason the author can name: re-place or enter.
-- **Do** use the single ease-out curve (`cubic-bezier(0.16, 1, 0.3, 1)`) for all motion, with backwards fill on entrances.
+- **Do** give every motion a reason the author can name: re-place, enter, select or move the camera.
+- **Do** use the ease-out curve (`cubic-bezier(0.16, 1, 0.3, 1)`) for fades and re-place, the spring for lift, camera, flip, thumb and islands, and backwards fill on entrances.
 - **Do** design light and dark together, remapping roles onto the same gray ramp.
 - **Do** keep a label on every wire, including coded ones.
 - **Do** draw the plates at the Fit scale and replace them with the fit message below 0.85; replace the matrix with the fit message when it is wider than the free area. Neither view scrolls sideways.
@@ -321,10 +330,10 @@ A centered card of up to 672px, 16px radius, 24px padding. It shows the question
 - **Do** check every new color pair for WCAG 2.2 AA in both modes.
 
 ### Don't:
-- **Don't** make the board look like draw.io, Mermaid or a free-floating node graph: no dragging concepts, no free zoom (only 1, 1.5, 2 and 3 times Fit).
+- **Don't** make the board look like draw.io, Mermaid or a free-floating node graph: no dragging concepts, no zoom below Fit and none past 3 times Fit.
 - **Don't** make the interface look like a generic SaaS dashboard of cards and charts.
 - **Don't** let color be the only carrier of meaning.
 - **Don't** give a free-text relation type its own hue; only `requires`, `complements` and `contains` are coded.
-- **Don't** round a plate, wire or matrix cell, and don't give anything on the board a shadow other than a pictogram's ground ellipse.
+- **Don't** round a plate, wire or matrix cell, and don't give anything on the board a shadow other than a pictogram's ground ellipse and the lifted selection.
 - **Don't** shear or squash text or pictograms with the plate; only their anchor points are projected.
 - **Don't** introduce a second font family or a gray outside the ramp.

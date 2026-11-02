@@ -1,5 +1,8 @@
 import { SEE_I_PARTS, type Concept, type QuestionState } from "@arch-mind/rules/model";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { pictogramFor } from "./layout.ts";
+import { neighbourhood, type Edge } from "./neighbourhood.ts";
+import { Pictogram } from "./pictogram-art.tsx";
 
 interface Detail {
   concept: Concept;
@@ -9,14 +12,33 @@ interface Detail {
 export const SEE_I_LABELS = { statement: "State", elaboration: "Elaborate", example: "Exemplify", illustration: "Illustrate" } as const;
 export const SHEET_WIDTH = 420;
 export const SECTION_TITLE = "mb-1.5 text-[11px] font-semibold uppercase tracking-widest text-ink-muted";
+const GROUP = "rounded-2xl border border-line bg-panel/60 p-3";
 
-export function ConceptDetail({ id, titles, onClose }: { id: string; titles: Map<string, string>; onClose: () => void }) {
+export function ConceptDetail({
+  id,
+  concepts,
+  names,
+  onSelect,
+  onClose,
+}: {
+  id: string;
+  concepts: Concept[];
+  names: Map<string, string>;
+  onSelect: (id: string) => void;
+  onClose: () => void;
+}) {
   const [detail, setDetail] = useState<Detail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const dialog = useRef<HTMLDivElement>(null);
+  const byId = useMemo(() => new Map(concepts.map((c) => [c.id, c])), [concepts]);
+  const hood = useMemo(() => neighbourhood(concepts, id), [concepts, id]);
 
   useEffect(() => {
     dialog.current?.focus();
+    dialog.current?.scrollTo({ top: 0 });
+  }, [id]);
+
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -37,6 +59,40 @@ export function ConceptDetail({ id, titles, onClose }: { id: string; titles: Map
   }, [id]);
 
   const concept = detail?.concept;
+  const name = (conceptId: string) => `${names.get(conceptId) ?? ""} ${byId.get(conceptId)?.title ?? conceptId}`.trim();
+
+  const relationRows = (edges: Edge[], label: string) => (
+    <div>
+      <h4 className="mb-1 text-[12px] font-semibold text-ink-muted">
+        {label} ({edges.length})
+      </h4>
+      {edges.length === 0 && <p className="text-ink-muted">None.</p>}
+      <ul className="flex flex-col gap-2">
+        {edges.map((e) => {
+          const otherId = e.source === id ? e.target : e.source;
+          const other = byId.get(otherId);
+          return (
+            <li key={`${e.source}>${e.type}>${e.target}`} data-testid="relation-row" data-other={otherId}>
+              <button type="button" className="press flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left hover:bg-canvas" onClick={() => onSelect(otherId)}>
+                {other && <Pictogram id={pictogramFor(other)} layer={other.layer} size={28} />}
+                <span className="min-w-0">
+                  <span className={e.source === id ? "text-ink-muted" : "font-semibold"}>{name(e.source)}</span>
+                  {" → "}
+                  <span className="font-medium">{e.type}</span>
+                  {" → "}
+                  <span className={e.target === id ? "text-ink-muted" : "font-semibold"}>{name(e.target)}</span>
+                </span>
+              </button>
+              <p className="px-2 text-ink-muted">Source: {e.citation}</p>
+              <p className="px-2">{e.explanation}</p>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+
+  const tinted = concept ? ({ "--k": `var(--layer-${concept.layer})` } as React.CSSProperties) : undefined;
   return (
     <div
       ref={dialog}
@@ -45,65 +101,69 @@ export function ConceptDetail({ id, titles, onClose }: { id: string; titles: Map
       aria-labelledby="concept-detail-title"
       tabIndex={-1}
       data-testid="concept-detail"
-      style={{ width: SHEET_WIDTH }}
-      className="sheet-in fixed bottom-4 right-4 top-4 z-30 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-2xl border border-line bg-panel p-4 text-[13px] shadow-lg"
+      data-layer={concept?.layer}
+      style={{ width: SHEET_WIDTH, ...tinted }}
+      className="sheet-in drawer fixed bottom-4 right-4 top-4 z-30 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-3xl text-[13px]"
     >
-      <div className="flex items-start justify-between gap-3">
-        <h2 id="concept-detail-title" className="text-[17px] font-semibold tracking-tight">
-          {concept?.title ?? id}
-        </h2>
-        <button type="button" onClick={onClose} className="rounded-lg border border-line px-2.5 py-1 text-ink-muted hover:text-ink">
-          Close
+      <div className="drawer-head flex items-start gap-3.5 p-4">
+        {concept && <Pictogram id={pictogramFor(concept)} layer={concept.layer} size={64} />}
+        <div className="min-w-0 flex-1">
+          {concept && (
+            <span className="layer-pill" data-testid="layer-pill">
+              {names.get(id)} · {concept.layer}
+            </span>
+          )}
+          <h2 id="concept-detail-title" className="mt-1 text-[19px] font-semibold leading-tight tracking-tight">
+            {concept?.title ?? byId.get(id)?.title ?? id}
+          </h2>
+          {concept && (
+            <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Facets">
+              {[...concept.domains.map((d) => ({ kind: "Domain", value: d })), ...concept.concerns.map((c) => ({ kind: "Concern", value: c }))].map((f) => (
+                <li key={`${f.kind}:${f.value}`} className="rounded-full border border-line px-2 py-0.5 text-[12px] text-ink-muted">
+                  <span className="sr-only">{f.kind}: </span>
+                  {f.value}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <button type="button" onClick={onClose} aria-label="Close" className="press close-btn">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+            <path d="m3 3 6 6M9 3 3 9" />
+          </svg>
         </button>
       </div>
       {error && (
-        <p role="alert" className="mt-3 text-correction">
+        <p role="alert" className="mx-4 text-correction">
           Could not load this concept: {error}
         </p>
       )}
-      {!detail && !error && <p className="mt-3 text-ink-muted">Loading</p>}
+      {!detail && !error && <p className="mx-4 text-ink-muted">Loading</p>}
       {detail && concept && (
-        <div className="mt-3 flex flex-col gap-5">
-          <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-            <dt className="text-ink-muted">Layer</dt>
-            <dd>{concept.layer}</dd>
-            <dt className="text-ink-muted">Domains</dt>
-            <dd>{concept.domains.join(", ") || "none"}</dd>
-            <dt className="text-ink-muted">Concerns</dt>
-            <dd>{concept.concerns.join(", ") || "none"}</dd>
-          </dl>
-
-          <section aria-labelledby="detail-see-i">
+        <div className="flex flex-col gap-3 px-3 pb-4">
+          <section aria-labelledby="detail-see-i" className={GROUP}>
             <h3 id="detail-see-i" className={SECTION_TITLE}>
               SEE-I
             </h3>
             {SEE_I_PARTS.map((part) => (
-              <div key={part} className="mb-2">
+              <div key={part} className="mb-2 last:mb-0">
                 <p className="font-medium">{SEE_I_LABELS[part]}</p>
                 <p className="whitespace-pre-wrap">{concept.seeI[part]}</p>
               </div>
             ))}
           </section>
 
-          <section aria-labelledby="detail-relations">
+          <section aria-labelledby="detail-relations" className={GROUP}>
             <h3 id="detail-relations" className={SECTION_TITLE}>
-              Relations ({concept.relations.length})
+              Relations ({(hood?.outgoing.length ?? 0) + (hood?.incoming.length ?? 0)})
             </h3>
-            {concept.relations.length === 0 && <p className="text-ink-muted">None yet.</p>}
-            <ul className="flex flex-col gap-3">
-              {concept.relations.map((r) => (
-                <li key={`${r.type}>${r.to}`}>
-                  <p className="font-medium">
-                    {r.type} → {titles.get(r.to) ?? r.to}
-                  </p>
-                  <p className="text-ink-muted">Source: {r.source}</p>
-                  <p>{r.explanation}</p>
-                </li>
-              ))}
-            </ul>
+            <div className="flex flex-col gap-3">
+              {relationRows(hood?.outgoing ?? [], "Outgoing")}
+              {relationRows(hood?.incoming ?? [], "Incoming")}
+            </div>
           </section>
 
-          <section aria-labelledby="detail-episodes">
+          <section aria-labelledby="detail-episodes" className={GROUP}>
             <h3 id="detail-episodes" className={SECTION_TITLE}>
               Episodes ({concept.episodes.length})
             </h3>
@@ -121,7 +181,7 @@ export function ConceptDetail({ id, titles, onClose }: { id: string; titles: Map
             </ul>
           </section>
 
-          <section aria-labelledby="detail-questions">
+          <section aria-labelledby="detail-questions" className={GROUP}>
             <h3 id="detail-questions" className={SECTION_TITLE}>
               Recall questions
             </h3>

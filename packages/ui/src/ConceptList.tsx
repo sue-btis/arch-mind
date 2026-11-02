@@ -5,14 +5,14 @@ import type { OpenConcept } from "./LayerView.tsx";
 const MEANING = new Map(PICTOGRAMS.map((p) => [p.id, p.meaning]));
 
 // The plates are a picture; this list carries the same concepts, pictograms and relations as text for keyboard and screen reader use.
-export function ConceptList({ concepts, onOpen }: { concepts: Concept[]; onOpen: OpenConcept }) {
+export function ConceptList({ concepts, selected, onOpen }: { concepts: Concept[]; selected: string | null; onOpen: OpenConcept }) {
   const designator = designators(concepts);
   const names = new Map(concepts.map((c) => [c.id, `${designator.get(c.id)} ${c.title}`]));
   const relations = new Map(concepts.map((c) => [c.id, c.relations.filter((r) => names.has(r.to) && r.to !== c.id)]));
   const ordered = LAYERS.flatMap((layer) => concepts.filter((c) => c.layer === layer));
   return (
     <details data-testid="concept-list" className="border-t border-line pt-2 text-[13px]">
-      <summary className="cursor-pointer py-1 font-medium">
+      <summary className="press cursor-pointer py-1 font-medium">
         Concepts and relations ({concepts.length} concepts, {[...relations.values()].reduce((n, r) => n + r.length, 0)} relations)
       </summary>
       <ul className="mt-2 flex flex-col gap-3">
@@ -20,7 +20,8 @@ export function ConceptList({ concepts, onOpen }: { concepts: Concept[]; onOpen:
           <li key={c.id}>
             <button
               type="button"
-              className="rounded text-left font-medium underline decoration-line underline-offset-4 hover:decoration-ink"
+              aria-current={c.id === selected ? "true" : undefined}
+              className="press rounded text-left font-medium underline decoration-line underline-offset-4 hover:decoration-ink"
               onClick={(e) => onOpen(c.id, e.currentTarget)}
             >
               {names.get(c.id)}
@@ -32,7 +33,17 @@ export function ConceptList({ concepts, onOpen }: { concepts: Concept[]; onOpen:
             <ul className="ml-4 mt-1 list-disc text-ink-muted">
               {relations.get(c.id)!.map((r) => (
                 <li key={`${r.type}>${r.to}`}>
-                  <span className="text-ink">{r.type}</span> → {names.get(r.to)}
+                  <span className="text-ink">{r.type}</span> →{" "}
+                  <span>
+                    <button
+                      type="button"
+                      aria-label={`${names.get(r.to)}, ${r.type} relation from ${names.get(c.id)}`}
+                      className="press rounded text-left underline decoration-line underline-offset-4 hover:decoration-ink"
+                      onClick={(e) => onOpen(r.to, e.currentTarget)}
+                    >
+                      {names.get(r.to)}
+                    </button>
+                  </span>
                 </li>
               ))}
             </ul>

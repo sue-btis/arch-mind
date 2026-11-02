@@ -246,7 +246,7 @@ describe("full-window canvas (AC-3, AC-4, AC-5, AC-6)", () => {
     }
   });
 
-  it("pans by dragging and by the wheel at Fit, and steps the zoom with Ctrl and the wheel at the pointer", async () => {
+  it("pans by dragging and by the wheel at Fit, and zooms in continuously with Ctrl and the wheel at the pointer", async () => {
     const { page, close } = await open(running, "light");
     try {
       const fit = await viewBox(page);
@@ -265,11 +265,16 @@ describe("full-window canvas (AC-3, AC-4, AC-5, AC-6)", () => {
       expect(wheeled.y).toBeGreaterThan(dragged.y);
       expect(wheeled.width).toBeCloseTo(fit.width, 3);
 
+      const before = await viewBox(page);
       await page.mouse.move(700, 300);
       await page.keyboard.down("Control");
       await page.mouse.wheel(0, -120);
       await page.keyboard.up("Control");
-      expect((await viewBox(page)).width).toBeCloseTo(fit.width / 1.5, 1);
+      const after = await viewBox(page);
+      expect(after.width).toBeLessThan(before.width);
+      expect(after.width).toBeGreaterThan(fit.width / 3);
+      const sceneXAtPointer = (v: { x: number; width: number }) => v.x + 700 * (v.width / VIEWPORT.width);
+      expect(sceneXAtPointer(after)).toBeCloseTo(sceneXAtPointer(before), 1);
       expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
     } finally {
       await close();

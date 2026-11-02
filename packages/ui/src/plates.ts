@@ -209,7 +209,7 @@ function boxAround(at: Point, width: number, height: number): Box {
   return { x0: at.x - width / 2, y0: at.y - height / 2, x1: at.x + width / 2, y1: at.y + height / 2 };
 }
 
-function union(boxes: Box[]): Box {
+export function union(boxes: Box[]): Box {
   return {
     x0: Math.min(...boxes.map((b) => b.x0)),
     y0: Math.min(...boxes.map((b) => b.y0)),
