@@ -46,6 +46,8 @@ async function freshStore(name: string, concepts: Concept[], lines: string[] = [
 async function openPage(server: RunningServer, scheme: "light" | "dark" = "light"): Promise<{ page: Page; close: () => Promise<void> }> {
   const context = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1, colorScheme: scheme });
   const page = await context.newPage();
+  // A hanging step then fails naming its locator, instead of the 30 s test timeout hiding which step it was.
+  page.setDefaultTimeout(10_000);
   await page.goto(`http://127.0.0.1:${server.port}/`);
   await page.waitForSelector('[data-testid="board"]');
   return { page, close: () => context.close() };
