@@ -99,9 +99,13 @@ export function createGlide(render: (visual: Cam, target: Cam) => void) {
         visual = { ...next };
         velocity.k = velocity.x = velocity.y = 0;
         render(visual, target);
-      } else if (!frame) {
-        last = performance.now();
-        frame = requestAnimationFrame(tick);
+      } else {
+        if (!frame) {
+          last = performance.now();
+          frame = requestAnimationFrame(tick);
+        }
+        // The new viewBox is already committed, so hold the content where it was seen until the next frame.
+        render(visual, target);
       }
     },
     // Scene units per second, so a released drag keeps sliding from the speed it was let go at.
