@@ -19,6 +19,9 @@ export { FIT_FLOOR, GROUND, LABEL_OFFSET, LABEL_PX, LINE_HEIGHT, PICTOGRAM_PX, S
 
 const SCENE_MARGIN = 12;
 const MIN_SEGMENT = 9;
+// Two drops through one gap closer than this read as one wire (the Board Grid Rule checks 10 px).
+const MIN_DROP_APART = 12;
+const NUDGE_REACH = 40;
 
 export interface Box {
   x0: number;
@@ -60,6 +63,7 @@ export interface SceneWire {
   source: string;
   target: string;
   label: string;
+  type: string | null;
   citation: string;
   explanation: string;
   path: Point[];
@@ -129,6 +133,30 @@ export function sharesLane(s1: { a: Point; b: Point }, s2: { a: Point; b: Point 
   return Math.min(length, hi) - Math.max(0, lo) > 1;
 }
 
+interface LaneRun {
+  y: number;
+  x0: number;
+  x1: number;
+}
+
+// A chip in a gap sits on its own lane; when its midpoint lies on another wire's drop it slides along the lane to the nearest clear spot.
+function slideChip(wire: SceneWire, run: LaneRun, wires: SceneWire[]): void {
+  const others = wires.filter((o) => o.id !== wire.id);
+  const size = { width: wire.chip.box.x1 - wire.chip.box.x0, height: wire.chip.box.y1 - wire.chip.box.y0 };
+  const clearAt = (x: number) => {
+    const box = boxAround({ x, y: run.y }, size.width, size.height);
+    return !others.some((o) => o.path.slice(1).some((b, i) => segmentHitsBox({ a: o.path[i]!, b }, box)));
+  };
+  const mid = wire.chip.at.x;
+  for (let d = 0; d <= run.x1 - run.x0; d++) {
+    for (const x of d === 0 ? [mid] : [mid - d, mid + d]) {
+      if (x < run.x0 || x > run.x1 || !clearAt(x)) continue;
+      wire.chip = { ...wire.chip, at: { x, y: run.y }, box: boxAround({ x, y: run.y }, size.width, size.height) };
+      return;
+    }
+  }
+}
+
 const LANE = 12;
 const LANE_PAD = 20;
 const MIN_GAP = 64;
@@ -160,6 +188,69 @@ interface Dive {
 }
 
 type Piece = { at: Point; band: number } | Dive;
+
+// One wire's visit to a gap as the points it was drawn with: leave `a`, lane ends `b` and `c`, enter `d`.
+interface Visit {
+  gap: number;
+  path: Point[];
+  a: Point;
+  b: Point;
+  c: Point;
+  d: Point;
+}
+
+interface Drop {
+  visit: Visit;
+  points: Point[];
+  // The other end of the lane run, when this drop is not the whole straight line.
+  partner?: Point;
+  // Each plate-edge point with the path point next to it and the shortest that segment may become.
+  ends: { at: Point; next: Point; floor: number }[];
+}
+
+// The shear moves a drop off the lower edge of a band by the band's height but not a drop onto the next band's top edge,
+// so two unrelated drops through one gap, or the two ends of one lane, can land a few px apart. Drops slide sideways, together
+// with their lane end, to the nearest x where they are clear of each other and leave no stub, so elk's vertical runs keep their order.
+function separateDrops(visits: Visit[]): void {
+  const drops = visits.flatMap((visit): Drop[] => {
+    const { path, a, b, c, d } = visit;
+    const end = (at: Point, next: Point | undefined) => (next ? [{ at, next, floor: Math.min(Math.hypot(at.x - next.x, at.y - next.y), 8.5) }] : []);
+    const before = path[path.indexOf(a) - 1];
+    const after = path[path.indexOf(d) + 1];
+    if (b === c) return [{ visit, points: [a, b, d], ends: [...end(a, before), ...end(d, after)] }];
+    return [
+      { visit, points: [a, b], partner: c, ends: end(a, before) },
+      { visit, points: [c, d], partner: b, ends: end(d, after) },
+    ];
+  });
+  const span = (drop: Drop) => [Math.min(...drop.points.map((p) => p.y)), Math.max(...drop.points.map((p) => p.y))] as const;
+  const clearAt = (drop: Drop, x: number) => {
+    const [lo, hi] = span(drop);
+    const run = drop.partner ? Math.abs(x - drop.partner.x) : 0;
+    return (
+      (run === 0 || run >= MIN_SEGMENT) &&
+      drop.ends.every((e) => Math.hypot(x - e.next.x, e.at.y - e.next.y) >= e.floor) &&
+      drops.every((o) => {
+        if (o.visit === drop.visit || o.visit.gap !== drop.visit.gap) return true;
+        const [olo, ohi] = span(o);
+        return Math.min(hi, ohi) - Math.max(lo, olo) <= 0 || Math.abs(x - o.points[0]!.x) >= MIN_DROP_APART;
+      })
+    );
+  };
+  for (let pass = 0; pass < 8; pass++) {
+    let moved = false;
+    for (const drop of drops) {
+      const x0 = drop.points[0]!.x;
+      if (clearAt(drop, x0)) continue;
+      const reach = Array.from({ length: 2 * NUDGE_REACH }, (_, i) => x0 + (i % 2 ? -1 : 1) * (Math.floor(i / 2) + 1));
+      const best = [...(drop.partner ? [drop.partner.x] : []), ...reach].sort((p, q) => Math.abs(p - x0) - Math.abs(q - x0)).find((x) => clearAt(drop, x));
+      if (best === undefined) continue;
+      for (const p of drop.points) p.x = best;
+      moved = true;
+    }
+    if (!moved) return;
+  }
+}
 
 // A vertical run that crosses a band edge gets a point there, so every gap visit starts and ends on a plate edge.
 function densify(bands: PlateBand[], route: Point[]): Point[] {
@@ -246,6 +337,11 @@ function sceneObject(n: PlateNode, onPlate: (p: Point) => Point, caption?: strin
 }
 
 export function buildScene(layout: PlateLayout, shear = SHEAR): Scene {
+  return projectScene(layout, shear).scene;
+}
+
+// `onPlate(band)` maps a band point onto the plate, so a caller can project extra shapes through the same mapping.
+export function projectScene(layout: PlateLayout, shear = SHEAR): { scene: Scene; onPlate: (band: number) => (p: Point) => Point } {
   const bands = layout.bands.map((b) => ({ ...b, top: b.top - EDGE_PAD, bottom: b.bottom + EDGE_PAD }));
   const routes = layout.edges.map((e) => piecesOf(bands, e.route));
   const dives: Dive[][] = bands.slice(0, -1).map(() => []);
@@ -278,18 +374,19 @@ export function buildScene(layout: PlateLayout, shear = SHEAR): Scene {
     };
   });
 
-  const wires: SceneWire[] = layout.edges.map((e, w) => {
+  const drafts = layout.edges.map((e, w) => {
     const path: Point[] = [];
     const anchors = new Set<Point>();
-    const lanes = new Map<number, Point>();
+    const visits: Visit[] = [];
     const push = (p: Point, anchor = false) => {
       const last = path[path.length - 1];
       if (last && Math.abs(last.x - p.x) < 0.01 && Math.abs(last.y - p.y) < 0.01) {
         if (anchor) anchors.add(last);
-        return;
+        return last;
       }
       path.push(p);
       if (anchor) anchors.add(p);
+      return p;
     };
     for (const piece of routes[w]!) {
       if ("at" in piece) {
@@ -300,12 +397,21 @@ export function buildScene(layout: PlateLayout, shear = SHEAR): Scene {
       const leave = onPlate(piece.fromBand)({ x: piece.from.x, y: piece.fromBand === piece.gap ? bands[piece.fromBand]!.bottom : bands[piece.fromBand]!.top });
       const enter = onPlate(piece.toBand)({ x: piece.to.x, y: piece.toBand === piece.gap ? bands[piece.toBand]!.bottom : bands[piece.toBand]!.top });
       const y = laneY(piece.gap, piece.lane);
-      push(leave, true);
-      push({ x: leave.x, y }, true);
-      push({ x: enter.x, y }, true);
-      push(enter, true);
-      lanes.set(piece.gap, { x: (leave.x + enter.x) / 2, y });
+      const a = push(leave, true);
+      const b = push({ x: leave.x, y }, true);
+      const c = push({ x: enter.x, y }, true);
+      const d = push(enter, true);
+      visits.push({ gap: piece.gap, path, a, b, c, d });
     }
+    return { e, path, anchors, visits };
+  });
+  separateDrops(drafts.flatMap((d) => d.visits));
+
+  const gapRuns: (LaneRun | undefined)[] = [];
+  const wires: SceneWire[] = drafts.map(({ e, path, anchors, visits }, w) => {
+    const lanes = new Map(visits.map((v) => [v.gap, { x: (v.a.x + v.d.x) / 2, y: v.b.y }]));
+    const laneRuns = new Map(visits.map((v) => [v.gap, { y: v.b.y, x0: Math.min(v.a.x, v.d.x), x1: Math.max(v.a.x, v.d.x) }]));
+    for (let i = path.length - 1; i > 0; i--) if (Math.abs(path[i]!.x - path[i - 1]!.x) < 0.01 && Math.abs(path[i]!.y - path[i - 1]!.y) < 0.01) path.splice(i, 1);
     // A jog shorter than a few px is only a rounding of elk's spacing after the squash; it reads as a stray stub.
     for (let i = 1; i < path.length - 1; ) {
       const short = Math.hypot(path[i]!.x - path[i - 1]!.x, path[i]!.y - path[i - 1]!.y) < MIN_SEGMENT || Math.hypot(path[i + 1]!.x - path[i]!.x, path[i + 1]!.y - path[i]!.y) < MIN_SEGMENT;
@@ -322,16 +428,23 @@ export function buildScene(layout: PlateLayout, shear = SHEAR): Scene {
     const centre = { x: e.labelBox.x + e.labelBox.width / 2, y: e.labelBox.y + e.labelBox.height / 2 };
     const where = locate(bands, centre.y);
     const at = "gap" in where ? (lanes.get(where.gap) ?? onPlate(where.gap)(centre)) : onPlate(where.band)(centre);
+    if ("gap" in where) gapRuns[w] = laneRuns.get(where.gap);
     return {
       id: e.id,
       source: e.source,
       target: e.target,
       label: e.label,
+      type: e.type === undefined ? e.label : e.type,
       citation: e.citation,
       explanation: e.explanation,
       path,
       chip: { at, lines, box: boxAround(at, size.width, size.height) },
     };
+  });
+
+  wires.forEach((wire, w) => {
+    const run = gapRuns[w];
+    if (run) slideChip(wire, run, wires);
   });
 
   const bounds = union([
@@ -343,7 +456,7 @@ export function buildScene(layout: PlateLayout, shear = SHEAR): Scene {
   ]);
   const padded = { x0: bounds.x0 - SCENE_MARGIN, y0: bounds.y0 - SCENE_MARGIN, x1: bounds.x1 + SCENE_MARGIN, y1: bounds.y1 + SCENE_MARGIN };
   objects.sort((a, b) => LAYERS.indexOf(a.layer) - LAYERS.indexOf(b.layer) || a.at.y - b.at.y);
-  return { plates, objects, wires, bounds: padded, width: padded.x1 - padded.x0, height: padded.y1 - padded.y0 };
+  return { scene: { plates, objects, wires, bounds: padded, width: padded.x1 - padded.x0, height: padded.y1 - padded.y0 }, onPlate };
 }
 
 export const ZOOMS = [1, 1.5, 2, 3] as const;

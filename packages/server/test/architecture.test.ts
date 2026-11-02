@@ -95,8 +95,7 @@ describe("architecture rules", () => {
     for (const layer of LAYERS) expect(symbols).toContain(layer);
   });
 
-  it("TST-039: the finder, legend filter, focus, facet search and prominence modules never write or keep state outside memory", () => {
-    // M10 adds its navigation modules here.
+  it("TST-039: the finder, legend filter, focus, facet search, grouping and prominence modules never write or keep state outside memory", () => {
     const navigationModules = [
       "ui/src/finder.ts",
       "ui/src/Finder.tsx",
@@ -106,6 +105,10 @@ describe("architecture rules", () => {
       "ui/src/FocusPill.tsx",
       "ui/src/FitMessage.tsx",
       "ui/src/facet-search.ts",
+      "ui/src/grouping.ts",
+      "ui/src/grouped-layout.ts",
+      "ui/src/grouped-scene.ts",
+      "ui/src/GroupPill.tsx",
     ];
     const nonGetFetch = /\bfetch\s*\([^)]*\bmethod\s*:\s*["'`](?!get["'`])/i;
     const browserStorage = /\b(localStorage|sessionStorage|indexedDB)\b/;

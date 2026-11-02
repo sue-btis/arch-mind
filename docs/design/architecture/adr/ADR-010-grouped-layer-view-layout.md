@@ -48,3 +48,11 @@ Option B: the grouped layer view lays out each domain group as an elk compound n
 
 ## Addendum — Open group and grouped-view floor (review RV-003, F-021)
 Accepted by: author, 2026-11-01, «Uno abierto a la vez (Recommended)» (verbatim, Spanish; PD-035). Opening a group first closes the open one, and the grouped layout is computed with the requested group open. If its Fit scale would be below 0.85, the group stays closed and the FR-049 message is shown. A grouped view whose Fit scale is below 0.85 with every group closed is refused with the FR-023 message, which then offers focus and narrower filters only.
+
+## Addendum — Fallback to Option A (M10 probe; revisit trigger)
+Accepted by: author, 2026-11-02, «A. Grafo de grupos (Recommended)» (verbatim, Spanish). The M10 probe (`docs/changes/2026-11-02-M10-grouped-view/execution.md`) met this ADR's revisit trigger. With every group closed, both fixtures rendered at Fit 1.0 with every scene check passing. With a group opened alone, elk routed each wire of an inner concept around the compound border, about 33 plate units outside it. That put wires on the first and last plate edges (runs up to 100.9 px against the 35 px limit) and produced a 2.69 px stub, a shared line and parallels under 10 px. Keeping the invariants would have needed rewriting elk's routes, that is, a hand-written router.
+
+The grouped layer view therefore uses Option A. Before layout, each closed group becomes one ordinary node on its layer's partition, and relations between groups merge into one edge per ordered pair. Opening a group replaces its node with its concepts, and the same flat, partitioned elk graph lays the view out again. The rest of the map re-places with the existing glide. Edge counts, shared-type labels, concept-to-closed-group edges, one open group at a time, the FR-049 rule and the projection all stay as in the Decision and the first addendum. Option B's in-place growth is given up.
+
+## Addendum — Count from two relations up (M10 review F-5)
+Accepted by: author, 2026-11-02, «Solo con 2 o más (Recommended)» (verbatim, Spanish; PRD PD-038). A connection that stands for two or more relations carries their number, plus their type when they all share one. A connection that stands for a single relation shows that relation's type alone, as the matrix does.

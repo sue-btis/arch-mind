@@ -112,7 +112,7 @@ describe("would-not-fit choices (TST-041, AC-045, AC-047)", () => {
       await message(page).waitFor();
       expect(await message(page).textContent()).toMatch(/narrow/);
       expect(await message(page).textContent()).toMatch(/85 %/);
-      expect(await message(page).getByRole("button").allTextContents()).toEqual(["Narrow the filters", "Focus on a concept"]);
+      expect(await message(page).getByRole("button").allTextContents()).toEqual(["Narrow the filters", "Focus on a concept", "Group by domain"]);
       await page.waitForTimeout(300);
       expect(await finder(page).count()).toBe(0);
       expect(await pill(page).count()).toBe(0);
@@ -168,7 +168,7 @@ describe("would-not-fit choices (TST-041, AC-045, AC-047)", () => {
       await drawer(page).waitFor();
       await pill(page).waitFor();
       await message(page).waitFor();
-      expect(await message(page).getByRole("button").allTextContents()).toEqual(["Narrow the filters", "Focus on a concept"]);
+      expect(await message(page).getByRole("button").allTextContents()).toEqual(["Narrow the filters", "Focus on a concept", "Group by domain"]);
     } finally {
       await close();
     }
@@ -178,7 +178,7 @@ describe("would-not-fit choices (TST-041, AC-045, AC-047)", () => {
     const { page, close } = await openPage(running, { view: "Matrix", viewport: NARROW_VIEWPORT });
     try {
       await message(page).waitFor();
-      expect(await message(page).getByRole("button").allTextContents()).toEqual(["Narrow the filters", "Focus on a concept"]);
+      expect(await message(page).getByRole("button").allTextContents()).toEqual(["Narrow the filters", "Focus on a concept", "Group by domain"]);
       expect(await page.locator("table").count()).toBe(0);
       await shot(page, "fit-message-matrix-light.png");
 
