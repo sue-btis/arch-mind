@@ -11,7 +11,7 @@
     "title": { "type": "string", "minLength": 1 },
     "layer": { "enum": ["client", "network", "server", "data"], "description": "Exactly one (BR-003)." },
     "pictogram": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "description": "Optional id of a library pictogram (BR-008, ADR-009). Membership in the library is checked by the rules module, not by this schema; a missing or unknown id shows the layer's pictogram (FR-038)." },
-    "domains": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true, "description": "Values from the facet catalog." },
+    "domains": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true, "description": "Values from the facet catalog. Order is preserved and meaningful: the first domain is the concept's group in the grouped layer view (BR-009)." },
     "concerns": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true, "description": "Values from the facet catalog." },
     "seeI": {
       "type": "object",

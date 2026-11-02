@@ -9,10 +9,12 @@ workspace "arch-mind" "Personal architecture study tool: capture from Claude Cod
 
         archMind = softwareSystem "arch-mind" "Captures, stores, shows and reviews architecture concepts on the author's computer." {
             ui = container "Study UI" "Layer plates view, matrix view, concept detail and review screen. Lays out each layer with elkjs and draws the plates as its own SVG (ADR-008)." "React, Vite, TypeScript, Tailwind CSS v4, shadcn CLI, Watermelon UI components (ADR-007)" "Browser" {
-                layout = component "Layer layout" "elkjs: computes the 2D layout and orthogonal routes of each layer (ADR-008)."
+                layout = component "Layer layout" "elkjs: one layered graph partitioned by layer; computes every cell, orthogonal route and label position (ADR-008 addendum \"One elk graph\")."
                 plates = component "Plates renderer" "Projects the layout isometrically and draws plates, pictograms, wires and labels as SVG; zoom and Fit change the viewBox; illustrations appear only as img elements (ADR-008, ADR-009)."
                 selection = component "Selection" "Holds the selected concept and derives its neighbourhood; every view and the relation drawer read it (FR-039, FR-041)."
                 drawer = component "Relation drawer" "Lists the selected concept's incoming and outgoing relations and its detail beside the view; choosing the other end selects that concept (FR-024, FR-040)."
+                navigation = component "Navigation at scale" "Finder over titles and designators, legend type filter, focus on the selection, and the would-not-fit choices; derives what to draw from the shown concepts and the selection, never stores it (FR-043 to FR-047)."
+                grouping = component "Domain grouping" "Builds the grouped layer view: one elk compound node per first-listed domain on each layer partition, open groups laid out inside (ADR-010, FR-048, BR-009)."
                 pictograms = component "Pictogram library" "Isometric pictogram artwork shipped as a UI asset, including the four layer pictograms used as fallback (ADR-009, FR-038)."
             }
             server = container "Local server" "Serves the UI and the JSON API on 127.0.0.1 only; loads concepts, replays review history, appends reviews (ADR-001, ADR-005)." "Node.js, TypeScript" {
@@ -50,6 +52,11 @@ workspace "arch-mind" "Personal architecture study tool: capture from Claude Cod
         archMind.ui.plates -> archMind.ui.pictograms "Draws concept and layer pictograms"
         archMind.ui.plates -> archMind.ui.selection "Reads and sets the selection"
         archMind.ui.drawer -> archMind.ui.selection "Reads and sets the selection"
+        archMind.ui.navigation -> archMind.ui.selection "Sets the selection from the finder and reads it for focus"
+        archMind.ui.grouping -> archMind.ui.layout "Lays out groups as compound nodes"
+        archMind.ui.plates -> archMind.ui.navigation "Reads what to draw: focus, legend type filter"
+        archMind.ui.navigation -> archMind.ui.grouping "Turns grouping on from the would-not-fit message"
+        archMind.ui.plates -> archMind.ui.grouping "Draws the grouped scene"
         archMind.ui.plates -> archMind.server.api "Reads concepts; loads illustrations as images" "HTTP"
         archMind.ui.drawer -> archMind.server.api "Reads concept detail and illustrations" "HTTP"
 

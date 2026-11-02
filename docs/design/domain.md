@@ -28,6 +28,11 @@
 | View | A filter over facets that selects concepts to draw. It is never stored as a copy of concepts. | FR-018, FR-015 |
 | Layer view | A view that draws the matching concepts as pictograms on stacked layer plates with typed arrows, for following chains. | FR-019 to FR-021, FR-037 to FR-042 |
 | Selection / neighbourhood | The selection is the one concept the author marked; its neighbourhood is the selected concept, its incoming and outgoing relations and the concepts they connect. Everything else recedes until the selection is cleared. | FR-039, FR-040, FR-041 |
+| Focus | A state of the layer view in which only the selection's neighbourhood is drawn; leaving focus restores the filtered view. Choosing focus from a refused matrix opens the layer view focused. It is never stored. | FR-045, FR-047 |
+| Group | The concepts on one plate that share a first listed domain, or the "No domain" group for concepts without one. Closed, it shows its domain and concept count; open, it shows its concepts. Only one group is open at a time, and a group that would not fit open stays closed. | FR-048, FR-049, BR-009 |
+| Grouped layer view | The layer view drawn with one group per domain on each plate, chosen by the author when a view would not fit, also from a refused matrix; relations between groups appear as one directed connection per ordered pair, each with the number of relations it stands for. | FR-047, FR-048 |
+| Finder | A keyboard search over the titles and designators of every concept in the store that makes the chosen concept the selection and brings it into view; when the filters hide it, they are cleared. It does not search concept text. | FR-043 |
+| Legend type filter | A relation type chosen in the wire legend: relations of that type stay prominent and the rest recede. With a selection, only what is both in the neighbourhood and of that type stays prominent. | FR-044, FR-039 |
 | Matrix view | A view that draws concepts as rows and columns, with relation types in the cells. | FR-022 |
 | Reference screen | A 1366 × 768 px desktop browser window at 100 % zoom; every view must fit its width. | NFR-001, FR-023 |
 
@@ -43,6 +48,7 @@
 - Invariants:
   - The identifier is unique across the store (BR-002).
   - Exactly one layer from the fixed list; any number of domains and concerns from the configured lists (BR-003, FR-006).
+  - The order of its domains is meaningful: the first listed domain is its group in the grouped layer view (BR-009).
   - A complete SEE-I, each part approved by the author (BR-005).
   - At least one recall question (BR-005).
   - Owns its outgoing relations; incoming relations belong to their own source concepts.

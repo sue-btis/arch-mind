@@ -154,7 +154,7 @@
             "layer": { "enum": ["client", "network", "server", "data"] },
             "pictogram": { "$ref": "#/$defs/pictogramId" },
             "illustration": { "$ref": "#/$defs/illustrationSvg" },
-            "domains": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+            "domains": { "type": "array", "items": { "type": "string" }, "uniqueItems": true, "description": "In the order the author confirmed; the first domain is the concept's group in the grouped layer view (BR-009)." },
             "concerns": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
             "seeI": { "$ref": "concept.schema.json#/properties/seeI" },
             "relations": { "type": "array", "items": { "$ref": "#/$defs/relation" } },

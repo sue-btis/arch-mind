@@ -49,8 +49,17 @@ Option A. React Flow is removed from the Study UI. The pictogram artwork is a fi
 ## Addendum — Fit scale and refusal floor (review RV-002, F-011)
 Accepted by: author, 2026-11-01, «Shrink with a floor (Recommended)». This adds a measurable criterion for FR-023 and leaves the Decision unchanged; the numbers are under Verification and in the NFR-001 row of `quality-attributes.md`.
 
+## Addendum — One elk graph (M05 Amendment 1; review RV-003, F-023)
+Accepted by: author, 2026-11-01, «elk routes all (Recommended)» (recorded in `docs/changes/2026-11-01-M05-layer-plates/spec.md` Amendment 1). The per-layer layout described under Option A is replaced by one elk layered graph partitioned by layer. elk computes every orthogonal route, cross-layer ones included, and every edge label position. The UI only projects each layer's band onto its plate, and draws each wire that changes plates as straight drops plus one lane per wire in the gap between plates. No hand-written router remains. Scene invariants, checked over the full TST-032 scene and every layer subset:
+- no wire crosses a concept or plate mark that is not one of its ends;
+- no two wires share a lane;
+- no wire crosses a concept label;
+- labels sit nearest their own wire;
+- wire ends sit on cell borders, with no stub under 8 px;
+- parallel wires that overlap for more than 20 px are at least 10 px apart.
+
 ## Verification / Revisit Trigger
-- Base sizes at scale 1: wire and connector labels 13 px, pictograms 44 px. Fit scale = min(1, available board width / projected width at scale 1). Readable means labels at least 11 px and pictograms at least 32 px on screen, so the floor is max(11 / 13, 32 / 44) = max(0.846, 0.727) = 0.85 (rounded up). When the Fit scale is below 0.85 the UI refuses to draw the view with the FR-023 message and suggests narrower filters.
+- Base sizes at scale 1: wire and connector labels 13 px, pictograms 44 px. Fit scale = min(1, available board width / projected width at scale 1). Readable means labels at least 11 px and pictograms at least 32 px on screen, so the floor is max(11 / 13, 32 / 44) = max(0.846, 0.727) = 0.85 (rounded up). When the Fit scale is below 0.85 the UI refuses to draw the view with the FR-023 message, which offers the FR-047 ways out.
 - Milestone check: the 13-concept TST-032 view renders at Fit scale 0.85 or more at 1366 × 768 with no horizontal scrollbar (NFR-001).
 - Keyboard test: every concept and relation can be selected and cleared without a pointer.
 - Revisit if the projected layout is wider than the reference screen at fit size for real views, or if hand-written hit-testing proves unreliable.
