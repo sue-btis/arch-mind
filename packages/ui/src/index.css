@@ -420,6 +420,30 @@ td {
 }
 .close-btn:hover { background: color-mix(in srgb, var(--ink) 14%, transparent); }
 
+.scrim-in { animation: fade-in 200ms var(--ease-out) backwards; }
+.finder-in {
+  transform: translateX(-50%);
+  animation: finder-in 300ms var(--spring) backwards;
+}
+@keyframes finder-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px) scale(0.97);
+  }
+}
+.finder-res .des { color: var(--k); }
+.finder-res .muted { color: var(--ink-muted); }
+.finder-res[aria-selected="true"] { background: var(--accent); color: var(--on-accent); }
+.finder-res[aria-selected="true"] .des { color: inherit; }
+.finder-res[aria-selected="true"] .muted { color: color-mix(in srgb, var(--on-accent) 75%, transparent); }
+
+/* While a type is active the other entries step back, like far concepts on the board; the text stays at full contrast. */
+.legend-btn { transition: background-color 200ms, transform 200ms var(--spring); }
+.legend-btn:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); }
+.legend-btn[aria-pressed="true"] { background: color-mix(in srgb, var(--ink) 10%, transparent); }
+.legend-btn:is(:hover, [aria-pressed="true"]) .legend-sub { color: var(--ink); }
+.legend[data-isolating] .legend-btn[aria-pressed="false"] svg { opacity: 0.4; transition: opacity 200ms var(--ease-out); }
+
 .card-in { animation: card-in 500ms var(--spring) backwards; }
 .card-in[data-leaving] { animation: card-out 260ms var(--ease-out) forwards; }
 .flip-in {
@@ -472,6 +496,7 @@ td {
   .stage[data-away],
   .press,
   .thumb,
+  .legend-btn,
   .progress-fill {
     transition: none;
   }
@@ -493,6 +518,8 @@ td {
   .wire[data-draw] .line { animation: none; }
 
   .sheet-in,
+  .scrim-in,
+  .finder-in,
   .card-in,
   .flip-in {
     animation: fade-in 120ms linear backwards;
