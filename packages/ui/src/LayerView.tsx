@@ -134,6 +134,7 @@ interface Fling {
 
 export function LayerView({
   concepts,
+  names,
   canvas,
   base,
   sheet,
@@ -142,8 +143,11 @@ export function LayerView({
   away,
   onOpen,
   onClear,
+  onNarrow,
+  onFocusConcept,
 }: {
   concepts: Concept[];
+  names: Map<string, string>;
   canvas: { width: number; height: number };
   // The part of the canvas no island covers, and how much of its right side the open detail sheet takes.
   base: Box;
@@ -154,6 +158,8 @@ export function LayerView({
   away: boolean;
   onOpen: OpenConcept;
   onClear: () => void;
+  onNarrow: () => void;
+  onFocusConcept: () => void;
 }) {
   const [layout, setLayout] = useState<PlateLayout | null>(null);
   const [settling, setSettling] = useState(false);
@@ -186,11 +192,11 @@ export function LayerView({
 
   useEffect(() => {
     let current = true;
-    layoutConcepts(concepts).then((l) => current && setLayout(l));
+    layoutConcepts(concepts, names).then((l) => current && setLayout(l));
     return () => {
       current = false;
     };
-  }, [concepts]);
+  }, [concepts, names]);
 
   useEffect(() => {
     if (!layout) return;
@@ -291,7 +297,7 @@ export function LayerView({
   if (scene && canvas.width > 0 && isRefused(scale)) {
     return (
       <div className="absolute" style={{ left: base.x0, top: base.y0 }}>
-        <FitMessage count={concepts.length} scale={scale} floor={FIT_FLOOR} available={base.x1 - base.x0} />
+        <FitMessage count={concepts.length} scale={scale} floor={FIT_FLOOR} available={base.x1 - base.x0} onNarrow={onNarrow} onFocusConcept={onFocusConcept} />
       </div>
     );
   }

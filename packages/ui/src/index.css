@@ -419,7 +419,26 @@ td {
   color: var(--ink-muted);
 }
 .close-btn:hover { background: color-mix(in srgb, var(--ink) 14%, transparent); }
+.focus-btn {
+  flex: none;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+}
+.focus-btn:hover { background: color-mix(in srgb, var(--ink) 14%, transparent); }
+.focus-btn[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
 
+.pill-in { animation: pill-in 300ms var(--spring) backwards; }
+@keyframes pill-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+  }
+}
 .scrim-in { animation: fade-in 200ms var(--ease-out) backwards; }
 .finder-in {
   transform: translateX(-50%);
@@ -520,6 +539,7 @@ td {
   .sheet-in,
   .scrim-in,
   .finder-in,
+  .pill-in,
   .card-in,
   .flip-in {
     animation: fade-in 120ms linear backwards;

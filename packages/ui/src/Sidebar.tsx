@@ -1,5 +1,6 @@
 import type { FileProblem, Layer } from "@arch-mind/rules/model";
-import type { ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { searchValues } from "./facet-search.ts";
 import { Pictogram } from "./pictogram-art.tsx";
 import { NO_FILTERS, hasFilters, type Filters } from "./filter.ts";
 import type { WireKind } from "./prominence.ts";
@@ -12,6 +13,8 @@ export interface FacetCatalog {
 }
 
 export const FILTERS_WIDTH = 200;
+// Domains and Concerns get a search field when their chips wrap past this many rows; Layers never does.
+const MAX_CHIP_ROWS = 3;
 
 const toggled = <T extends string>(list: T[], value: T): T[] => (list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
 const LABEL = "text-[11px] font-semibold uppercase tracking-widest text-ink-muted";
@@ -25,6 +28,7 @@ function FilterGroup<T extends string>({
   onToggle,
   onAll,
   counts,
+  searchable: canSearch = false,
 }: {
   legend: string;
   values: T[];
@@ -32,29 +36,62 @@ function FilterGroup<T extends string>({
   onToggle: (v: T) => void;
   onAll: () => void;
   counts?: Record<string, number>;
+  searchable?: boolean;
 }) {
+  const [query, setQuery] = useState("");
+  const [searchable, setSearchable] = useState(false);
+  const chips = useRef<HTMLDivElement>(null);
+
+  // Rows are measured with every chip showing, so a narrowed list never takes the field away while it is being typed in.
+  useLayoutEffect(() => {
+    const el = chips.current;
+    if (!canSearch || !el || query) return;
+    const measure = () => setSearchable(new Set([...el.children].map((c) => (c as HTMLElement).offsetTop)).size > MAX_CHIP_ROWS);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [canSearch, query, values]);
+
+  const visible = searchValues(values, selected, query);
   return (
     <fieldset className="m-0 min-w-0 border-0 p-0">
       <legend className={`mb-1.5 p-0 ${LABEL}`}>{legend}</legend>
       {values.length === 0 ? (
         <p className="text-[13px] text-ink-muted">None configured.</p>
       ) : (
-        <div className="flex flex-wrap gap-1.5">
-          <button type="button" className={CHIP} aria-pressed={selected.length === 0} onClick={onAll}>
-            All
-          </button>
-          {values.map((v) => (
-            <button key={v} type="button" role="checkbox" aria-checked={selected.includes(v)} className={CHIP} onClick={() => onToggle(v)}>
-              {counts && <Pictogram id={v} layer={v} size={20} />}
-              <span className="break-words">{v}</span>
-              {counts && (
-                <span aria-hidden="true" className="tabular-nums opacity-80">
-                  {counts[v] ?? 0}
-                </span>
-              )}
+        <>
+          {searchable && (
+            <input
+              type="text"
+              role="searchbox"
+              aria-label={`Search ${legend}`}
+              placeholder="Search"
+              autoComplete="off"
+              spellCheck={false}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="mb-1.5 w-full rounded-lg border border-line bg-transparent px-2.5 py-1 text-[13px] text-ink placeholder:text-ink-muted"
+            />
+          )}
+          <div ref={chips} className="flex flex-wrap gap-1.5">
+            <button type="button" className={CHIP} aria-pressed={selected.length === 0} onClick={onAll}>
+              All
             </button>
-          ))}
-        </div>
+            {visible.map((v) => (
+              <button key={v} type="button" role="checkbox" aria-checked={selected.includes(v)} className={CHIP} onClick={() => onToggle(v)}>
+                {counts && <Pictogram id={v} layer={v} size={20} />}
+                <span className="break-words">{v}</span>
+                {counts && (
+                  <span aria-hidden="true" className="tabular-nums opacity-80">
+                    {counts[v] ?? 0}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+          {query && visible.length === 0 && <p className="mt-1.5 text-[13px] text-ink-muted">No match.</p>}
+        </>
       )}
     </fieldset>
   );
@@ -93,8 +130,8 @@ export function Sidebar({
       </button>
       <div id="filters-body" hidden={!open} className="flex min-h-0 flex-col gap-5 overflow-y-auto">
         <FilterGroup legend="Layers" values={facets.layers} selected={filters.layers} counts={layerCounts} onToggle={(v) => onChange({ ...filters, layers: toggled(filters.layers, v) })} onAll={() => onChange({ ...filters, layers: [] })} />
-        <FilterGroup legend="Domains" values={facets.domains} selected={filters.domains} onToggle={(v) => onChange({ ...filters, domains: toggled(filters.domains, v) })} onAll={() => onChange({ ...filters, domains: [] })} />
-        <FilterGroup legend="Concerns" values={facets.concerns} selected={filters.concerns} onToggle={(v) => onChange({ ...filters, concerns: toggled(filters.concerns, v) })} onAll={() => onChange({ ...filters, concerns: [] })} />
+        <FilterGroup legend="Domains" searchable values={facets.domains} selected={filters.domains} onToggle={(v) => onChange({ ...filters, domains: toggled(filters.domains, v) })} onAll={() => onChange({ ...filters, domains: [] })} />
+        <FilterGroup legend="Concerns" searchable values={facets.concerns} selected={filters.concerns} onToggle={(v) => onChange({ ...filters, concerns: toggled(filters.concerns, v) })} onAll={() => onChange({ ...filters, concerns: [] })} />
         {hasFilters(filters) && (
           <button type="button" className="press self-start rounded-lg border border-line px-2.5 py-1 text-[13px] text-ink-muted hover:text-ink" onClick={() => onChange(NO_FILTERS)}>
             Clear filters

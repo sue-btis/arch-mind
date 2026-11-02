@@ -15,12 +15,16 @@ export function MatrixView({
   hood,
   wireType,
   onOpen,
+  onNarrow,
+  onFocusConcept,
 }: {
   concepts: Concept[];
   boardWidth: number;
   hood: Neighbourhood | null;
   wireType: WireKind | null;
   onOpen: OpenConcept;
+  onNarrow: () => void;
+  onFocusConcept: () => void;
 }) {
   const matrix = useMemo(() => buildMatrix(concepts), [concepts]);
   const container = useRef<HTMLDivElement>(null);
@@ -33,7 +37,7 @@ export function MatrixView({
     row?.scrollIntoView({ block: "nearest", behavior: prefersReducedMotion() ? "instant" : "smooth" });
   }, [hood?.id]);
 
-  if (boardWidth > 0 && needed > boardWidth) return <FitMessage count={concepts.length} needed={needed} available={boardWidth} />;
+  if (boardWidth > 0 && needed > boardWidth) return <FitMessage count={concepts.length} needed={needed} available={boardWidth} onNarrow={onNarrow} onFocusConcept={onFocusConcept} />;
   const near = hood ? new Set([hood.id, ...hood.connected]) : null;
   const headerState = (id: string) => (!hood || !near ? undefined : id === hood.id ? "selected" : near.has(id) ? "near" : "far");
   const label = (i: number) => `${matrix.headers[i]!.designator} ${matrix.headers[i]!.title}`;

@@ -18,13 +18,19 @@ export function ConceptDetail({
   id,
   concepts,
   names,
+  focused,
   onSelect,
+  canFocus,
+  onToggleFocus,
   onClose,
 }: {
   id: string;
   concepts: Concept[];
   names: Map<string, string>;
+  focused: boolean;
   onSelect: (id: string) => void;
+  canFocus: boolean;
+  onToggleFocus: () => void;
   onClose: () => void;
 }) {
   const [detail, setDetail] = useState<Detail | null>(null);
@@ -39,10 +45,11 @@ export function ConceptDetail({
   }, [id]);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    // While focus is on, the first Escape belongs to the app and leaves focus with the drawer kept.
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !e.defaultPrevented && !focused && onClose();
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, focused]);
 
   useEffect(() => {
     const abort = new AbortController();
@@ -127,6 +134,11 @@ export function ConceptDetail({
             </ul>
           )}
         </div>
+        {canFocus && (
+          <button type="button" onClick={onToggleFocus} aria-pressed={focused} className="press focus-btn">
+            Focus
+          </button>
+        )}
         <button type="button" onClick={onClose} aria-label="Close" className="press close-btn">
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
             <path d="m3 3 6 6M9 3 3 9" />

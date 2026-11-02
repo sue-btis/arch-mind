@@ -95,9 +95,18 @@ describe("architecture rules", () => {
     for (const layer of LAYERS) expect(symbols).toContain(layer);
   });
 
-  it("TST-039: the finder, legend filter and prominence modules never write or keep state outside memory", () => {
-    // M09 and M10 add their navigation modules here.
-    const navigationModules = ["ui/src/finder.ts", "ui/src/Finder.tsx", "ui/src/prominence.ts", "ui/src/Sidebar.tsx"];
+  it("TST-039: the finder, legend filter, focus, facet search and prominence modules never write or keep state outside memory", () => {
+    // M10 adds its navigation modules here.
+    const navigationModules = [
+      "ui/src/finder.ts",
+      "ui/src/Finder.tsx",
+      "ui/src/prominence.ts",
+      "ui/src/Sidebar.tsx",
+      "ui/src/focus.ts",
+      "ui/src/FocusPill.tsx",
+      "ui/src/FitMessage.tsx",
+      "ui/src/facet-search.ts",
+    ];
     const nonGetFetch = /\bfetch\s*\([^)]*\bmethod\s*:\s*["'`](?!get["'`])/i;
     const browserStorage = /\b(localStorage|sessionStorage|indexedDB)\b/;
     const violations = (text: string) => [nonGetFetch.test(text) && "non-GET fetch", browserStorage.test(text) && "browser storage"].filter(Boolean);
