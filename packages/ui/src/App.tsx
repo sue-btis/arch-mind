@@ -1,10 +1,13 @@
+import type { MouseEvent } from "react";
 import type { Concept, FileProblem, Layer } from "@arch-mind/rules/model";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ConceptDetail, SHEET_WIDTH } from "./ConceptDetail.tsx";
 import { ConceptList } from "./ConceptList.tsx";
 import { NO_FILTERS, filterConcepts, type Filters } from "./filter.ts";
+import { designators } from "./layout.ts";
 import { LayerView } from "./LayerView.tsx";
 import { MatrixView } from "./MatrixView.tsx";
+import { neighbourhood } from "./neighbourhood.ts";
 import { PictogramDefs } from "./pictogram-art.tsx";
 import type { Box } from "./plates.ts";
 import { ReviewScreen } from "./ReviewScreen.tsx";
@@ -39,7 +42,11 @@ export function App() {
   const [view, setView] = useState<View>("layers");
   const [selected, setSelected] = useState<string | null>(null);
   const [canvas, setCanvas] = useState({ width: 0, height: 0 });
+  // The plates stay mounted behind Review only once they have been shown, so opening Review first never pays for a layout.
+  const [platesShown, setPlatesShown] = useState(false);
+  const [thumb, setThumb] = useState<{ left: number; width: number } | null>(null);
   const board = useRef<HTMLDivElement>(null);
+  const switcher = useRef<HTMLDivElement>(null);
   const opener = useRef<HTMLElement | SVGElement | null>(null);
 
   useEffect(() => {
@@ -68,6 +75,28 @@ export function App() {
     return counts;
   }, [data]);
 
+  useEffect(() => {
+    if (data && view === "layers") setPlatesShown(true);
+  }, [data, view]);
+
+  const hood = useMemo(() => (selected ? neighbourhood(shown, selected) : null), [shown, selected]);
+  // The drawer can name a concept the filters hide, so it falls back to the numbering of the whole store.
+  const names = useMemo(() => new Map([...designators(data?.concepts ?? []), ...designators(shown)]), [data, shown]);
+
+  // The web font changes the button widths after first paint, so the thumb follows the switch's size too.
+  useLayoutEffect(() => {
+    const el = switcher.current;
+    if (!el) return;
+    const measure = () => {
+      const active = el.querySelector<HTMLElement>('[aria-pressed="true"]');
+      if (active) setThumb({ left: active.offsetLeft, width: active.offsetWidth });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [view]);
+
   const open = useCallback((id: string, from: HTMLElement | SVGElement) => {
     opener.current = from;
     setSelected(id);
@@ -88,6 +117,8 @@ export function App() {
   };
   const sheet = selected ? SHEET_WIDTH + MARGIN : 0;
   const scroller = { padding: `${base.y0}px ${MARGIN + sheet}px ${BOTTOM_INSET}px ${base.x0}px` };
+  const clearOnEmpty = (e: MouseEvent<HTMLElement>) => e.target === e.currentTarget && selected && close();
+  const inReview = view === "review";
 
   return (
     <main className="fixed inset-0 overflow-hidden">
@@ -95,29 +126,30 @@ export function App() {
         <PictogramDefs />
       </svg>
       <div ref={board} className="canvas-dots absolute inset-0" data-testid="board" data-view={view}>
-        {data && view === "layers" && <LayerView concepts={shown} canvas={canvas} base={base} sheet={sheet} revealId={selected} onOpen={open} />}
+        {data && (view === "layers" || (inReview && platesShown)) && <LayerView concepts={shown} canvas={canvas} base={base} sheet={sheet} hood={hood} away={inReview} onOpen={open} onClear={close} />}
         {data && view === "matrix" && (
-          <div className="absolute inset-0 overflow-auto" style={scroller}>
-            <MatrixView concepts={shown} boardWidth={base.x1 - base.x0} onOpen={open} />
+          <div className="absolute inset-0 overflow-auto" style={scroller} onClick={clearOnEmpty}>
+            <MatrixView concepts={shown} boardWidth={base.x1 - base.x0} hood={hood} onOpen={open} />
           </div>
         )}
-        {view === "review" && (
+        {inReview && (
           <div className="absolute inset-0 overflow-auto" style={scroller}>
             <ReviewScreen titles={titles} onOpenConcept={open} />
           </div>
         )}
       </div>
 
-      <div className="absolute left-4 top-4 z-10 flex items-center gap-2 rounded-2xl border border-line bg-panel p-1.5 shadow-lg">
+      <div className="island absolute left-4 top-4 z-10 flex items-center gap-2 rounded-2xl p-1.5">
         <h1 className="px-2 text-[15px] font-semibold tracking-tight">arch-mind</h1>
-        <div role="group" aria-label="View" className="flex gap-1 rounded-xl bg-canvas p-1">
+        <div ref={switcher} role="group" aria-label="View" className="relative flex gap-1 rounded-xl bg-canvas p-1">
+          {thumb && <span aria-hidden="true" className="thumb" style={{ left: thumb.left, width: thumb.width }} />}
           {(["layers", "matrix", "review"] as const).map((v) => (
             <button
               key={v}
               type="button"
               aria-pressed={view === v}
               onClick={() => setView(v)}
-              className={`rounded-lg px-3 py-1 text-[13px] ${view === v ? "bg-accent text-on-accent" : "text-ink-muted hover:text-ink"}`}
+              className={`press relative rounded-lg px-3 py-1 text-[13px] ${view === v ? "text-on-accent" : "text-ink-muted hover:text-ink"}`}
             >
               {VIEW_LABELS[v]}
             </button>
@@ -126,7 +158,7 @@ export function App() {
       </div>
 
       {data && (view !== "review" || data.problems.length > 0) && (
-        <div className="absolute right-4 top-4 z-10 flex items-center gap-4 rounded-2xl border border-line bg-panel px-4 py-2.5 shadow-lg">
+        <div className="island absolute right-4 top-4 z-10 flex items-center gap-4 rounded-2xl px-4 py-2.5">
           {view !== "review" && (
             <p className="text-[13px] tabular-nums text-ink-muted" aria-live="polite">
               {`${shown.length} of ${data.concepts.length} concepts shown`}
@@ -137,18 +169,18 @@ export function App() {
       )}
 
       {error && (
-        <p role="alert" className="absolute left-1/2 top-4 z-10 -translate-x-1/2 rounded-2xl border border-line bg-panel px-4 py-2.5 text-correction shadow-lg">
+        <p role="alert" className="island absolute left-1/2 top-4 z-10 -translate-x-1/2 rounded-2xl px-4 py-2.5 text-correction">
           Could not load concepts: {error}
         </p>
       )}
 
       {data && (
-        <Sidebar facets={data.facets} filters={filters} onChange={setFilters} layerCounts={layerCounts} open={filtersOpen} onToggle={() => setFiltersOpen(!filtersOpen)}>
-          {view === "layers" && <ConceptList concepts={shown} onOpen={open} />}
+        <Sidebar facets={data.facets} filters={filters} onChange={setFilters} layerCounts={layerCounts} open={filtersOpen} onToggle={() => setFiltersOpen(!filtersOpen)} away={inReview}>
+          {view === "layers" && <ConceptList concepts={shown} selected={selected} onOpen={open} />}
         </Sidebar>
       )}
-      {data && <WireLegend />}
-      {selected && <ConceptDetail id={selected} titles={titles} onClose={close} />}
+      {data && <WireLegend away={inReview} />}
+      {selected && data && <ConceptDetail id={selected} concepts={data.concepts} names={names} onSelect={setSelected} onClose={close} />}
     </main>
   );
 }

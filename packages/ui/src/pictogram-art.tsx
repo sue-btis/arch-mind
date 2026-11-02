@@ -1,3 +1,5 @@
+import type { CSSProperties } from "react";
+
 // Isometric pictograms on a 48 x 48 grid; every symbol id is a catalog id from the rules package.
 // Faces take their color from --ft, --fl and --fr, set per object by the plates renderer.
 export function PictogramDefs() {
@@ -55,5 +57,13 @@ export function PictogramDefs() {
         <ellipse className="gnd" cx="24" cy="40" rx="19" ry="9.5"/><polygon className="fl" points="6,37 28,48 28,30 6,19"/><polygon className="fr" points="42,41 28,48 28,30 42,23"/><polygon className="ft" points="20,12 42,23 28,30 6,19"/><g transform="matrix(1 .5 0 1 6 19)"><rect className="dk" x="2" y="2" width="18" height="13"/><polygon className="lt" points="6,5 6,12 11.5,8.5"/><path className="ln lnl" d="M13 12h4"/></g>
       </symbol>
     </defs>
+  );
+}
+
+export function Pictogram({ id, layer, size, className = "" }: { id: string; layer: string; size: number; className?: string }) {
+  return (
+    <svg viewBox="0 0 48 48" width={size} height={size} aria-hidden="true" className={`plates pic shrink-0 overflow-visible ${className}`} style={{ "--k": `var(--layer-${layer})` } as CSSProperties}>
+      <use href={`#${id}`} width="48" height="48" />
+    </svg>
   );
 }
