@@ -158,7 +158,7 @@ export function App() {
       </div>
 
       {data && (view !== "review" || data.problems.length > 0) && (
-        <div className="island absolute right-4 top-4 z-10 flex items-center gap-4 rounded-2xl px-4 py-2.5">
+        <div className="island absolute top-4 z-10 flex items-center gap-4 rounded-2xl px-4 py-2.5" style={{ right: MARGIN + sheet }}>
           {view !== "review" && (
             <p className="text-[13px] tabular-nums text-ink-muted" aria-live="polite">
               {`${shown.length} of ${data.concepts.length} concepts shown`}

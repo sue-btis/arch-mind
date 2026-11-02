@@ -208,6 +208,19 @@ describe("selection and the relation drawer (TST-027, AC-029, AC-030, AC-030a, A
     }
   });
 
+  it("moves the counts island out from behind the open drawer", async () => {
+    const { page, close } = await openPlates(running);
+    try {
+      await select(page, COMPACT);
+      await page.waitForTimeout(700);
+      const counts = (await page.getByText(/ of \d+ concepts shown$/).boundingBox())!;
+      const drawer = (await page.getByTestId("concept-detail").boundingBox())!;
+      expect(counts.x + counts.width).toBeLessThanOrEqual(drawer.x);
+    } finally {
+      await close();
+    }
+  });
+
   it("draws the neighbourhood wires on from source to target within 600 ms", async () => {
     const { page, close } = await openPlates(running);
     try {
