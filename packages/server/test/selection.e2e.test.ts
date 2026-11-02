@@ -111,6 +111,12 @@ async function expectInFreeArea(page: Page, ids: string[]) {
   }
 }
 
+// Animation frames and event timestamps then advance only through page.clock, so the camera is measured in its own time, not the machine's.
+async function pauseClock(page: Page) {
+  await page.clock.install();
+  await page.clock.pauseAt(Date.now() + 1000);
+}
+
 async function select(page: Page, id: string) {
   await concept(page, id).click();
   await drawer(page).waitFor();
@@ -415,10 +421,17 @@ describe("camera feel (AC-034)", () => {
   it("glides to a zoom step and settles within 600 ms", async () => {
     const { page, close } = await openPlates(running);
     try {
+      await pauseClock(page);
+      const target = concept(page, FOCUS);
       await page.getByRole("button", { name: "Zoom in" }).click();
       expect(await worldTransform(page)).not.toBeNull();
-      await page.waitForTimeout(700);
+      await page.clock.runFor(600);
+      const at600 = (await target.boundingBox())!;
+      await page.clock.runFor(400);
       expect(await worldTransform(page)).toBeNull();
+      const rest = (await target.boundingBox())!;
+      expect(Math.abs(at600.x - rest.x)).toBeLessThan(0.5);
+      expect(Math.abs(at600.y - rest.y)).toBeLessThan(0.5);
     } finally {
       await close();
     }
@@ -427,19 +440,20 @@ describe("camera feel (AC-034)", () => {
   it("keeps sliding after a drag is released", async () => {
     const { page, close } = await openPlates(running);
     try {
+      await pauseClock(page);
       await page.getByRole("button", { name: "Zoom in" }).click();
-      await page.waitForTimeout(600);
+      await page.clock.runFor(1000);
       const first = concept(page, FOCUS);
       const empty = await emptyPoint(page);
       await page.mouse.move(empty.x, empty.y);
       await page.mouse.down();
       for (let i = 1; i <= 6; i++) {
         await page.mouse.move(empty.x - i * 12, empty.y);
-        await page.waitForTimeout(12);
+        await page.clock.runFor(16);
       }
       await page.mouse.up();
       const released = (await first.boundingBox())!.x;
-      await page.waitForTimeout(500);
+      await page.clock.runFor(500);
       expect((await first.boundingBox())!.x).toBeLessThan(released - 5);
     } finally {
       await close();
