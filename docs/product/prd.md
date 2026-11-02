@@ -203,7 +203,7 @@ A facet group whose values do not fit the filters without scrolling offers a fie
 When a view would not fit (FR-023), the message offers three ways out, and the app takes none of them on its own: narrower filters, focusing on a concept (FR-045), or grouping the layer view by domain (FR-048). When the refused view is the matrix, narrower filters keep the matrix, while focusing or grouping opens the layer view focused or grouped.
 
 ### FR-048
-In the grouped layer view each plate shows one group per domain with its concept count, and relations between groups are shown as one labeled connection per pair with the number of relations it stands for; opening a group shows its concepts and their relations in place.
+In the grouped layer view each plate shows one group per domain with its concept count, and relations between groups are shown as one labeled connection per pair, labeled with the number of relations it stands for when there are two or more; opening a group shows its concepts and their relations in place.
 
 ### FR-049
 Only one group is open at a time: opening a group closes the one that was open. A group whose concepts would not fit when opened (NFR-001) stays closed, and the app says so and offers focusing on one of its concepts or narrower filters.
@@ -353,6 +353,7 @@ With 300 concepts and 600 recall questions, the review screen shows the due ques
 | PD-035 | What happens when opening a group would make the grouped view not fit? | Decided | One group open at a time; a group that would not fit alone stays closed and the app offers focus or narrower filters | author | 2026-11-01 | «Uno abierto a la vez (Recommended)» (verbatim, Spanish) | FR-049, review RV-003 F-021 |
 | PD-036 | Which ways out does a refused matrix view offer? | Decided | Narrower filters keep the matrix; focus and grouping open the layer view focused or grouped | author | 2026-11-01 | «Llevan a capas (Recommended)» (verbatim, Spanish) | FR-047, review RV-003 F-022 |
 | PD-037 | Which concepts does the finder search? | Decided | Every concept in the store; choosing one hidden by the filters clears them | author | 2026-11-01 | «Todo el store (Recommended)» (verbatim, Spanish) | FR-043, review RV-003 F-025 |
+| PD-038 | Does a group connection that stands for one relation show the number 1? | Decided | No: the number appears from two relations up, as in the matrix; a single relation shows its type | author | 2026-11-02 | «Solo con 2 o más (Recommended)» (verbatim, Spanish) | FR-048, ADR-010, review of M10 F-5 |
 | PD-034 | When do the finder, legend filter and scaling options enter the product? | Decided | In one PRD amendment after M06 | author | 2026-11-01 | «Después de M06 (Recommended)» (verbatim, Spanish) and «Yes, add them» | FR-043 to FR-049, §12 |
 
 ## 16. Product Traceability

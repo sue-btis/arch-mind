@@ -339,3 +339,33 @@ export const overWideConcepts: Concept[] = [
     concept(`wide-${i + 1}`, `Wide spoke ${i + 1}`, "server", ["Statement.", "Elaboration.", "Example.", "Illustration."], "What is this?"),
   ),
 ];
+
+// Grouped-view probe fixture. By first-listed domain per layer the groups are: client/mobile (3), client/web (1),
+// network/mobile (2), network/No domain (1), server/web (13, too wide to open), server/models (2), data/models (3).
+// Relations run between groups in both directions, and "g-pay" lists two domains, so its first one decides its group.
+const grouped = (id: string, title: string, layer: Layer, domains: string[], relations: [to: string, type: string][] = []): Concept => ({
+  ...concept(id, title, layer, ["Statement.", "Elaboration.", "Example.", "Illustration."], "What is this?"),
+  domains,
+  relations: relations.map(([to, type]) => ({ type, to, source: "Fixture", explanation: `${title} ${type} ${to}.` })),
+});
+
+export const groupedConcepts: Concept[] = [
+  grouped("g-app", "Mobile app", "client", ["mobile"], [["g-pay", "uses"], ["g-sync", "sends"], ["g-hub", "sends"]]),
+  grouped("g-pay", "Payment sheet", "client", ["mobile", "models"], [["g-ledger", "sends"], ["g-sync", "uses"]]),
+  grouped("g-cache", "Local cache", "client", ["mobile"], [["g-app", "contains"]]),
+  grouped("g-page", "Web page", "client", ["web"], [["g-hub", "uses"], ["g-edge", "sends"]]),
+  grouped("g-sync", "Sync channel", "network", ["mobile"], [["g-hub", "sends"], ["g-cache", "sends"]]),
+  grouped("g-push", "Push channel", "network", ["mobile"], [["g-app", "sends"]]),
+  grouped("g-edge", "Edge proxy", "network", [], [["g-hub", "uses"], ["g-page", "sends"]]),
+  grouped("g-hub", "Web hub", "server", ["web"], [
+    ...Array.from({ length: 12 }, (_, i): [string, string] => [`g-spoke-${i + 1}`, "uses"]),
+    ["g-push", "sends"],
+    ["g-ledger", "uses"],
+  ]),
+  ...Array.from({ length: 12 }, (_, i) => grouped(`g-spoke-${i + 1}`, `Web spoke ${i + 1}`, "server", ["web"])),
+  grouped("g-ledger", "Ledger service", "server", ["models"], [["g-store", "contains"], ["g-audit", "sends"]]),
+  grouped("g-audit", "Audit trail", "server", ["models"], [["g-store", "sends"]]),
+  grouped("g-store", "Ledger store", "data", ["models"], [["g-index", "contains"]]),
+  grouped("g-index", "Ledger index", "data", ["models"], [["g-archive", "sends"]]),
+  grouped("g-archive", "Cold archive", "data", ["models"], [["g-app", "uses"]]),
+];

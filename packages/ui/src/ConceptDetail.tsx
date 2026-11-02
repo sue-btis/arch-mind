@@ -19,6 +19,7 @@ export function ConceptDetail({
   concepts,
   names,
   focused,
+  keepOnEscape,
   onSelect,
   canFocus,
   onToggleFocus,
@@ -28,6 +29,8 @@ export function ConceptDetail({
   concepts: Concept[];
   names: Map<string, string>;
   focused: boolean;
+  // Focus and an open group each take their own Escape before the drawer closes.
+  keepOnEscape: boolean;
   onSelect: (id: string) => void;
   canFocus: boolean;
   onToggleFocus: () => void;
@@ -45,11 +48,11 @@ export function ConceptDetail({
   }, [id]);
 
   useEffect(() => {
-    // While focus is on, the first Escape belongs to the app and leaves focus with the drawer kept.
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !e.defaultPrevented && !focused && onClose();
+    // While focus is on or a group is open, the first Escape belongs to the app and the drawer is kept.
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !e.defaultPrevented && !keepOnEscape && onClose();
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [onClose, focused]);
+  }, [onClose, keepOnEscape]);
 
   useEffect(() => {
     const abort = new AbortController();

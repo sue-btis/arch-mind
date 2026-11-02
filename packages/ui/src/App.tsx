@@ -7,6 +7,8 @@ import { NO_FILTERS, filterConcepts, type Filters } from "./filter.ts";
 import { Finder } from "./Finder.tsx";
 import { focusedConcepts } from "./focus.ts";
 import { FocusPill } from "./FocusPill.tsx";
+import { GroupPill } from "./GroupPill.tsx";
+import { groupConcepts, groupIdOf, parseGroupId } from "./grouping.ts";
 import { clearHidingFacets } from "./finder.ts";
 import { designators } from "./layout.ts";
 import { LayerView } from "./LayerView.tsx";
@@ -50,6 +52,10 @@ export function App() {
   const [finderOpen, setFinderOpen] = useState(false);
   // Focus is a state of the layer view only: it lives here, in memory, and ends with the selection.
   const [focused, setFocused] = useState(false);
+  // Grouping, like focus, lives only in memory and ends with the view that offered it.
+  const [grouped, setGrouped] = useState(false);
+  const [requestedGroup, setRequestedGroup] = useState<string | null>(null);
+  const [finderGroup, setFinderGroup] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const [canvas, setCanvas] = useState({ width: 0, height: 0 });
   // The plates stay mounted behind Review only once they have been shown, so opening Review first never pays for a layout.
@@ -94,6 +100,14 @@ export function App() {
   const hood = useMemo(() => (selected ? neighbourhood(shown, selected) : null), [shown, selected]);
   const focusSet = useMemo(() => (focused && selected ? focusedConcepts(shown, selected) : null), [focused, shown, selected]);
   const focusActive = focusSet !== null && focusSet.length > 0;
+  // Focus takes over the board; grouping and its open group wait underneath and come back when focus ends.
+  const groupedBoard = grouped && !focusActive;
+  const requestedOpen = useMemo(() => (grouped && requestedGroup && groupConcepts(shown).some((g) => g.id === requestedGroup) ? requestedGroup : null), [grouped, requestedGroup, shown]);
+  // LayerView decides whether the requested group fits; the list and the announcements follow that same decision.
+  const [fit, setFit] = useState<{ id: string; blocked: boolean } | null>(null);
+  const settled = requestedOpen !== null && fit?.id === requestedOpen;
+  const openGroup = settled && !fit.blocked ? requestedOpen : null;
+  const blockedGroup = settled && fit.blocked ? requestedOpen : null;
   // The drawer can name a concept the filters hide, so it falls back to the numbering of the whole store.
   const names = useMemo(() => new Map([...designators(data?.concepts ?? []), ...designators(shown)]), [data, shown]);
 
@@ -131,7 +145,18 @@ export function App() {
   // Focus is a state of the layer view, so leaving it for the matrix or Review ends it.
   const changeView = (next: View) => {
     if (next !== "layers") setFocused(false);
+    if (next !== view) leaveGrouping();
     setView(next);
+  };
+  const leaveGrouping = () => {
+    setGrouped(false);
+    setRequestedGroup(null);
+  };
+  const groupByDomain = () => {
+    setFocused(false);
+    setGrouped(true);
+    setRequestedGroup(null);
+    setView("layers");
   };
 
   // Clearing the selection, or filters that hide the focused concept, leave focus; it must not resume with the next selection.
@@ -147,14 +172,29 @@ export function App() {
     wasFocused.current = focusActive;
     // Moving focus to another concept is not a start or an end, so the name stays out of the dependencies.
   }, [focusActive]);
+  const wasGrouped = useRef(false);
+  useEffect(() => {
+    if (grouped) setAnnouncement("Grouped by domain");
+    else if (wasGrouped.current) setAnnouncement("Grouping ended");
+    wasGrouped.current = grouped;
+  }, [grouped]);
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    if (openGroup) setAnnouncement(`Opened the ${parseGroupId(openGroup).domain} group`);
+    else if (blockedGroup) setAnnouncement(`The ${parseGroupId(blockedGroup).domain} group stays closed: it would not fit`);
+    else if (wasOpen.current) setAnnouncement("Group closed");
+    wasOpen.current = openGroup !== null;
+  }, [openGroup, blockedGroup]);
   const closeFinder = useCallback(() => {
     setFinderOpen(false);
+    setFinderGroup(null);
     focusOnChoose.current = false;
     const from = finderFrom.current;
     finderFrom.current = null;
     if (from?.isConnected) from.focus();
   }, []);
-  const openFinder = (forFocus: boolean) => {
+  const openFinder = (forFocus: boolean, group: string | null = null) => {
+    setFinderGroup(group);
     const active = document.activeElement;
     finderFrom.current = active instanceof HTMLElement || active instanceof SVGElement ? active : null;
     focusOnChoose.current = forFocus;
@@ -173,6 +213,8 @@ export function App() {
     setFilters(clearHidingFacets(chosen, filters));
     setSelected(id);
     setFinderOpen(false);
+    setFinderGroup(null);
+    if (grouped && !focusOnChoose.current) setRequestedGroup(groupIdOf(chosen));
     if (focusOnChoose.current) startFocus();
     focusOnChoose.current = false;
     // A drawer already open on this concept would not move focus by itself.
@@ -188,6 +230,7 @@ export function App() {
         openFinder(false);
       } else if (e.key === "Escape" && !finderOpen && !e.defaultPrevented) {
         if (focused) exitFocus();
+        else if (requestedOpen) setRequestedGroup(null);
         else if (!selected) setWireType(null);
       } else if (e.key.toLowerCase() === "f" && !e.ctrlKey && !e.metaKey && !e.altKey && selected && !inReview && !finderOpen && !(e.target instanceof Element && e.target.closest("input, textarea, select, [contenteditable]"))) {
         startFocus();
@@ -196,7 +239,7 @@ export function App() {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
     // openFinder only writes refs and a setter, so a stale copy behaves the same.
-  }, [closeFinder, exitFocus, startFocus, focused, inReview, finderOpen, selected]);
+  }, [closeFinder, exitFocus, startFocus, focused, inReview, finderOpen, selected, requestedOpen]);
 
   // The part of the canvas the islands leave free. The detail sheet narrows it from the right without refitting the view.
   const base: Box = {
@@ -215,10 +258,10 @@ export function App() {
         <PictogramDefs />
       </svg>
       <div ref={board} className="canvas-dots absolute inset-0" data-testid="board" data-view={view}>
-        {data && (view === "layers" || (inReview && platesShown)) && <LayerView concepts={focusSet ?? shown} names={names} canvas={canvas} base={base} sheet={sheet} hood={hood} wireType={wireType} away={inReview} onOpen={open} onClear={close} onNarrow={narrowFilters} onFocusConcept={() => openFinder(true)} />}
+        {data && (view === "layers" || (inReview && platesShown)) && <LayerView concepts={focusSet ?? shown} names={names} canvas={canvas} base={base} sheet={sheet} hood={hood} wireType={wireType} away={inReview} onOpen={open} onClear={close} onNarrow={narrowFilters} onFocusConcept={(group) => openFinder(true, group)} grouped={groupedBoard} openGroup={requestedOpen} onFit={(id, blocked) => setFit((now) => (now?.id === id && now.blocked === blocked ? now : { id, blocked }))} onOpenGroup={setRequestedGroup} onGroup={groupByDomain} onFocusSelected={startFocus} />}
         {data && view === "matrix" && (
           <div className="absolute inset-0 overflow-auto" style={scroller} onClick={clearOnEmpty}>
-            <MatrixView concepts={shown} boardWidth={base.x1 - base.x0} hood={hood} wireType={wireType} onOpen={open} onNarrow={narrowFilters} onFocusConcept={() => openFinder(true)} />
+            <MatrixView concepts={shown} boardWidth={base.x1 - base.x0} hood={hood} wireType={wireType} onOpen={open} onNarrow={narrowFilters} onFocusConcept={() => openFinder(true)} onGroup={groupByDomain} />
           </div>
         )}
         {inReview && (
@@ -257,6 +300,7 @@ export function App() {
         </div>
       )}
 
+      {groupedBoard && view === "layers" && <GroupPill sheet={sheet} onExit={leaveGrouping} />}
       {focusActive && <FocusPill designator={selected ? names.get(selected) ?? "" : ""} title={selected ? titles.get(selected) ?? selected : ""} sheet={sheet} onExit={exitFocus} />}
       <p role="status" aria-live="polite" className="sr-only">
         {announcement}
@@ -270,12 +314,12 @@ export function App() {
 
       {data && (
         <Sidebar facets={data.facets} filters={filters} onChange={setFilters} layerCounts={layerCounts} open={filtersOpen} onToggle={() => setFiltersOpen(!filtersOpen)} away={inReview}>
-          {view === "layers" && <ConceptList concepts={shown} selected={selected} onOpen={open} />}
+          {view === "layers" && <ConceptList concepts={shown} selected={selected} grouped={groupedBoard} openGroup={openGroup} onOpen={open} onOpenGroup={setRequestedGroup} />}
         </Sidebar>
       )}
       {data && <WireLegend away={inReview} active={wireType} onChange={setWireType} />}
-      {finderOpen && data && <Finder concepts={data.concepts} onChoose={choose} onClose={closeFinder} />}
-      {selected && data && <ConceptDetail id={selected} concepts={data.concepts} names={names} focused={focusActive} canFocus={!inReview} onSelect={setSelected} onToggleFocus={focusActive ? exitFocus : startFocus} onClose={close} />}
+      {finderOpen && data && <Finder concepts={finderGroup ? data.concepts.filter((c) => groupIdOf(c) === finderGroup) : data.concepts} onChoose={choose} onClose={closeFinder} />}
+      {selected && data && <ConceptDetail id={selected} concepts={data.concepts} names={names} focused={focusActive} keepOnEscape={focusActive || requestedOpen !== null} canFocus={!inReview} onSelect={setSelected} onToggleFocus={focusActive ? exitFocus : startFocus} onClose={close} />}
     </main>
   );
 }

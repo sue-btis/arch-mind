@@ -53,6 +53,8 @@ export interface PlateEdge {
   source: string;
   target: string;
   label: string;
+  // The relation type the edge stands for, or null when its relations differ; absent means the label is the type.
+  type?: string | null;
   citation: string;
   explanation: string;
   route: Point[];

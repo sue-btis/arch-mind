@@ -58,6 +58,14 @@ Accepted by: author, 2026-11-01, «elk routes all (Recommended)» (recorded in `
 - wire ends sit on cell borders, with no stub under 8 px;
 - parallel wires that overlap for more than 20 px are at least 10 px apart.
 
+## Addendum — Drop separation at the plate edges (M10 review F-7)
+Accepted by: author, 2026-11-02, «Aceptar el ajuste (Recommended)» (verbatim, Spanish). The shear moves a drop leaving a band's lower edge by the shear times the band height, but leaves a drop entering the next band's top edge where it is. Two drops elk spaced apart can therefore land 0.4 to 6 px apart in a gap, or a lane can shrink to a sliver. When that happens the projection slides the drop sideways, together with its lane end and the plate-edge end of the in-plate segment beside it, to the nearest position that meets three conditions:
+- at least 12 px from every overlapping drop in the gap;
+- a lane run of 0 or at least 9 px;
+- an adjacent segment of at least 8.5 px.
+
+The slide is capped at 40 px; the largest observed is 11 px. elk's bends, lane order and topology are kept, and no path is searched. This is the third projection-level adjustment, after jog pruning and the gap-chip slide. The flat TST-032 view is unchanged in every layer subset.
+
 ## Verification / Revisit Trigger
 - Base sizes at scale 1: wire and connector labels 13 px, pictograms 44 px. Fit scale = min(1, available board width / projected width at scale 1). Readable means labels at least 11 px and pictograms at least 32 px on screen, so the floor is max(11 / 13, 32 / 44) = max(0.846, 0.727) = 0.85 (rounded up). When the Fit scale is below 0.85 the UI refuses to draw the view with the FR-023 message, which offers the FR-047 ways out.
 - Milestone check: the 13-concept TST-032 view renders at Fit scale 0.85 or more at 1366 × 768 with no horizontal scrollbar (NFR-001).

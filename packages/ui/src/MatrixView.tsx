@@ -17,6 +17,7 @@ export function MatrixView({
   onOpen,
   onNarrow,
   onFocusConcept,
+  onGroup,
 }: {
   concepts: Concept[];
   boardWidth: number;
@@ -25,6 +26,7 @@ export function MatrixView({
   onOpen: OpenConcept;
   onNarrow: () => void;
   onFocusConcept: () => void;
+  onGroup: () => void;
 }) {
   const matrix = useMemo(() => buildMatrix(concepts), [concepts]);
   const container = useRef<HTMLDivElement>(null);
@@ -37,7 +39,7 @@ export function MatrixView({
     row?.scrollIntoView({ block: "nearest", behavior: prefersReducedMotion() ? "instant" : "smooth" });
   }, [hood?.id]);
 
-  if (boardWidth > 0 && needed > boardWidth) return <FitMessage count={concepts.length} needed={needed} available={boardWidth} onNarrow={onNarrow} onFocusConcept={onFocusConcept} />;
+  if (boardWidth > 0 && needed > boardWidth) return <FitMessage count={concepts.length} needed={needed} available={boardWidth} onNarrow={onNarrow} onFocusConcept={onFocusConcept} onGroup={onGroup} />;
   const near = hood ? new Set([hood.id, ...hood.connected]) : null;
   const headerState = (id: string) => (!hood || !near ? undefined : id === hood.id ? "selected" : near.has(id) ? "near" : "far");
   const label = (i: number) => `${matrix.headers[i]!.designator} ${matrix.headers[i]!.title}`;

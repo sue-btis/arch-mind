@@ -1,7 +1,10 @@
 import { LAYERS, PICTOGRAMS, type Concept } from "@arch-mind/rules/model";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import { MAX_ZOOM, createGlide, frameBox, prefersReducedMotion, stepZoom, wheelZoom, type Cam } from "./camera.ts";
-import { FitMessage } from "./FitMessage.tsx";
+import { FitMessage, GroupMessage } from "./FitMessage.tsx";
+import { layoutGrouped, type GroupedLayout } from "./grouped-layout.ts";
+import { buildGroupedScene, type GroupedScene, type SceneGroup } from "./grouped-scene.ts";
+import { groupIdOf } from "./grouping.ts";
 import { layoutConcepts, type PlateLayout, type Point } from "./layout.ts";
 import type { Neighbourhood } from "./neighbourhood.ts";
 import {
@@ -20,9 +23,11 @@ import {
   viewFor,
   zoomAround,
   type Box,
+  type Scene,
   type SceneObject,
   type SceneWire,
 } from "./plates.ts";
+import { textWidth } from "./metrics.ts";
 import { wireProminence as prominenceOfWire, type Prominence, type WireKind } from "./prominence.ts";
 import { RelationPopover, useRelationPopover, type RelationInfo, type RelationTargetProps } from "./Popover.tsx";
 import { wireCode, wireStyle } from "./wire-code.ts";
@@ -35,6 +40,8 @@ const MAX_FLING_PX_PER_MS = 3;
 const SAMPLE_MS = 100;
 const STALE_RELEASE_MS = 80;
 const MARKER_CODES = ["requires", "complements", "contains", "alternative", "other"] as const;
+const GROUP_CHIP_PAD = 8;
+const GROUP_CHIP_HEIGHT = 22;
 const MEANING = new Map(PICTOGRAMS.map((p) => [p.id, p.meaning]));
 
 export type OpenConcept = (id: string, opener: HTMLElement | SVGElement) => void;
@@ -42,7 +49,7 @@ export type OpenConcept = (id: string, opener: HTMLElement | SVGElement) => void
 const layerStyle = (layer: string): CSSProperties => ({ "--k": `var(--layer-${layer})` }) as CSSProperties;
 const polyline = (points: Point[]) => points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
 const pathLength = (points: Point[]) => points.reduce((sum, p, i) => (i === 0 ? 0 : sum + Math.hypot(p.x - points[i - 1]!.x, p.y - points[i - 1]!.y)), 0);
-const markerId = (type: string) => `m-${wireCode(type) ?? "other"}`;
+const markerId = (type: string | null) => `m-${(type && wireCode(type)) ?? "other"}`;
 
 function Wire({
   wire,
@@ -82,23 +89,24 @@ function Wire({
       }}
     >
       <path className="hit" d={d} />
-      <path className="line" d={d} style={wireStyle(wireCode(wire.label))} markerEnd={`url(#${markerId(wire.label)})`} />
+      <path className="line" d={d} style={wireStyle(wire.type === null ? null : wireCode(wire.type))} markerEnd={`url(#${markerId(wire.type)})`} />
     </g>
   );
 }
 
-function ConceptMark({ object, prominence, onOpen, onFocus }: { object: SceneObject; prominence: Prominence | undefined; onOpen: OpenConcept; onFocus: (box: Box) => void }) {
+function ConceptMark({ object, group, prominence, onOpen, onFocus }: { object: SceneObject; group: boolean; prominence: Prominence | undefined; onOpen: OpenConcept; onFocus: (box: Box) => void }) {
   const meaning = MEANING.get(object.pictogram) ?? object.pictogram;
+  const name = group ? `${object.title} group, ${object.designator} ${object.designator === "1" ? "concept" : "concepts"}` : `${object.designator} ${object.title}`;
   return (
     <g
       className="obj"
-      data-testid="concept"
+      data-testid={group ? "group" : "concept"}
       data-id={object.id}
       data-pictogram={object.pictogram}
       data-state={prominence}
       tabIndex={0}
       role="button"
-      aria-label={`${object.designator} ${object.title}`}
+      aria-label={name}
       style={{ ...layerStyle(object.layer), transform: `translate(${object.at.x}px, ${object.at.y}px)` }}
       onClick={(e) => onOpen(object.id, e.currentTarget)}
       onFocus={() => onFocus(object.box)}
@@ -108,7 +116,7 @@ function ConceptMark({ object, prominence, onOpen, onFocus }: { object: SceneObj
         onOpen(object.id, e.currentTarget);
       }}
     >
-      <title>{`${object.designator} ${object.title}: ${meaning}`}</title>
+      <title>{group ? `${name}: open it` : `${object.designator} ${object.title}: ${meaning}`}</title>
       <ellipse className="focus" rx={32} ry={16} />
       <ellipse className="halo" rx={44} ry={22} cy={-4} />
       <g className="lift">
@@ -122,6 +130,41 @@ function ConceptMark({ object, prominence, onOpen, onFocus }: { object: SceneObj
           </tspan>
         ))}
       </text>
+    </g>
+  );
+}
+
+function OpenGroup({ group, onClose, onFocus }: { group: SceneGroup; onClose: () => void; onFocus: (box: Box) => void }) {
+  const text = `${group.domain} ×`;
+  const width = textWidth(text) + 2 * GROUP_CHIP_PAD;
+  const at = group.corners[0]!;
+  const xs = group.corners.map((c) => c.x);
+  const ys = group.corners.map((c) => c.y);
+  const box = { x0: Math.min(...xs), y0: Math.min(...ys) - GROUP_CHIP_HEIGHT - 4, x1: Math.max(...xs), y1: Math.max(...ys) };
+  return (
+    <g className="group-open" data-testid="open-group" data-id={group.id} style={layerStyle(group.layer)}>
+      <polygon className="group-box" points={group.corners.map((c) => `${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(" ")} />
+      <g
+        className="group-close"
+        data-testid="group-close"
+        tabIndex={0}
+        role="button"
+        aria-label={`Close the ${group.domain} group`}
+        transform={`translate(${at.x} ${at.y - GROUP_CHIP_HEIGHT - 4})`}
+        onClick={onClose}
+        onFocus={() => onFocus(box)}
+        onKeyDown={(e) => {
+          if (e.key !== "Enter" && e.key !== " ") return;
+          e.preventDefault();
+          onClose();
+        }}
+      >
+        <rect className="chip-face" width={width} height={GROUP_CHIP_HEIGHT} rx={6} />
+        <rect className="focus" width={width} height={GROUP_CHIP_HEIGHT} rx={6} />
+        <text x={width / 2} y={GROUP_CHIP_HEIGHT - 6} textAnchor="middle">
+          {text}
+        </text>
+      </g>
     </g>
   );
 }
@@ -145,6 +188,12 @@ export function LayerView({
   onClear,
   onNarrow,
   onFocusConcept,
+  grouped,
+  openGroup,
+  onFit,
+  onOpenGroup,
+  onGroup,
+  onFocusSelected,
 }: {
   concepts: Concept[];
   names: Map<string, string>;
@@ -159,9 +208,16 @@ export function LayerView({
   onOpen: OpenConcept;
   onClear: () => void;
   onNarrow: () => void;
-  onFocusConcept: () => void;
+  onFocusConcept: (groupId?: string) => void;
+  grouped: boolean;
+  openGroup: string | null;
+  // Says whether the requested group fits, once its layout has landed.
+  onFit: (id: string, blocked: boolean) => void;
+  onOpenGroup: (id: string | null) => void;
+  onGroup: () => void;
+  onFocusSelected: () => void;
 }) {
-  const [layout, setLayout] = useState<PlateLayout | null>(null);
+  const [layouts, setLayouts] = useState<{ main: PlateLayout | GroupedLayout; closed: GroupedLayout | null } | null>(null);
   const [settling, setSettling] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState<Point | null>(null);
@@ -192,11 +248,15 @@ export function LayerView({
 
   useEffect(() => {
     let current = true;
-    layoutConcepts(concepts, names).then((l) => current && setLayout(l));
+    // A group that would not fit open needs the all-closed layout to fall back to, so both are laid out.
+    const laidOut = grouped
+      ? Promise.all([layoutGrouped(concepts, openGroup, names), openGroup ? layoutGrouped(concepts, null, names) : null]).then(([main, closed]) => ({ main, closed: closed ?? main }))
+      : layoutConcepts(concepts, names).then((main) => ({ main, closed: null }));
+    laidOut.then((l) => current && setLayouts(l));
     return () => {
       current = false;
     };
-  }, [concepts, names]);
+  }, [concepts, names, grouped, openGroup]);
 
   useEffect(() => {
     if (!layout) return;
@@ -207,9 +267,25 @@ export function LayerView({
     setSettling(true);
     const timer = setTimeout(() => setSettling(false), SETTLE_MS);
     return () => clearTimeout(timer);
-  }, [layout]);
+  }, [layouts]);
 
-  const scene = useMemo(() => (layout ? buildScene(layout) : null), [layout]);
+  const requested = useMemo<Scene | GroupedScene | null>(() => (layouts ? ("groups" in layouts.main ? buildGroupedScene(layouts.main) : buildScene(layouts.main)) : null), [layouts]);
+  const closedScene = useMemo(() => (layouts?.closed && layouts.closed !== layouts.main ? buildGroupedScene(layouts.closed) : null), [layouts]);
+  const requestedScale = requested ? fitScale(base.x1 - base.x0, requested.width) : 1;
+  const blocked = requested && closedScene && isRefused(requestedScale) ? layouts!.closed!.groups.find((g) => g.open === false && g.id === openGroup) : undefined;
+  const scene = blocked ? closedScene : requested;
+  const layout = blocked ? layouts!.closed : layouts?.main;
+  const groupedScene = scene !== null && "groups" in scene;
+  const laidOutGroup = layouts && "groups" in layouts.main ? (layouts.main.groups.find((g) => g.open)?.id ?? null) : null;
+  const blockedId = blocked?.id ?? null;
+  useEffect(() => {
+    if (openGroup && laidOutGroup === openGroup) onFit(openGroup, blockedId === openGroup);
+  }, [openGroup, laidOutGroup, blockedId]);
+  const closedGroups = new Set(groupedScene ? (layout as GroupedLayout).groups.filter((g) => !g.open).map((g) => g.id) : []);
+  // A concept inside a closed group is drawn as that group.
+  const conceptGroup = new Map(concepts.map((c) => [c.id, groupIdOf(c)]));
+  const drawnAs = (id: string) => (closedGroups.has(conceptGroup.get(id) ?? "") ? conceptGroup.get(id)! : id);
+  const shownHood = hood && groupedScene ? { ...hood, id: drawnAs(hood.id), connected: [...new Set(hood.connected.map(drawnAs))] } : hood;
 
   const free: Box = { ...base, x1: base.x1 - sheet };
   const scale = scene ? fitScale(base.x1 - base.x0, scene.width) : 1;
@@ -261,15 +337,15 @@ export function LayerView({
 
   useEffect(() => {
     if (!scene) return;
-    if (!hood) {
+    if (!hood || !shownHood) {
       const back = before.current;
       before.current = null;
       if (back) setCamera(back.zoom, back.pan);
       return;
     }
-    const ids = new Set([hood.id, ...hood.connected]);
+    const ids = new Set([shownHood.id, ...shownHood.connected]);
     const boxes = scene.objects.filter((o) => ids.has(o.id)).map((o) => o.box);
-    const selected = scene.objects.find((o) => o.id === hood.id);
+    const selected = scene.objects.find((o) => o.id === shownHood.id);
     if (!selected) return;
     before.current ??= { ...cam.current };
     const framed = frameBox(union(boxes), free, scale, selected.box);
@@ -297,17 +373,25 @@ export function LayerView({
   if (scene && canvas.width > 0 && isRefused(scale)) {
     return (
       <div className="absolute" style={{ left: base.x0, top: base.y0 }}>
-        <FitMessage count={concepts.length} scale={scale} floor={FIT_FLOOR} available={base.x1 - base.x0} onNarrow={onNarrow} onFocusConcept={onFocusConcept} />
+        <FitMessage
+          count={concepts.length}
+          scale={scale}
+          floor={FIT_FLOOR}
+          available={base.x1 - base.x0}
+          onNarrow={onNarrow}
+          onFocusConcept={() => onFocusConcept()}
+          onGroup={groupedScene ? undefined : onGroup}
+        />
       </div>
     );
   }
 
-  const labels = new Map(layout?.nodes.map((n) => [n.id, `${n.designator} ${n.title}`]));
+  const labels = new Map(layout?.nodes.map((n) => [n.id, closedGroups.has(n.id) ? `${n.title} group` : `${n.designator} ${n.title}`]));
   const view = viewFor(canvas, k, origin);
 
-  const near = hood ? new Set([hood.id, ...hood.connected]) : null;
-  const objectProminence = (id: string): Prominence | undefined => (!hood || !near ? undefined : id === hood.id ? "selected" : near.has(id) ? "near" : "far");
-  const wireProminence = (w: SceneWire) => prominenceOfWire(hood, wireType, w);
+  const near = shownHood ? new Set([shownHood.id, ...shownHood.connected]) : null;
+  const objectProminence = (id: string): Prominence | undefined => (!shownHood || !near ? undefined : id === shownHood.id ? "selected" : near.has(id) ? "near" : "far");
+  const wireProminence = (w: SceneWire) => prominenceOfWire(shownHood, wireType, w, groupedScene ? (layout as GroupedLayout).types[w.id] : undefined);
   const plateProminence = (layer: string): Prominence | undefined =>
     !near ? undefined : scene?.objects.some((o) => o.layer === layer && near.has(o.id)) ? "near" : "far";
 
@@ -357,7 +441,7 @@ export function LayerView({
           role="group"
           aria-label={`Concepts on plates by layer: ${LAYERS.join(", ")}`}
           onPointerDown={(e) => {
-            if (e.button !== 0 || (e.target as Element).closest(".obj, .wire")) return;
+            if (e.button !== 0 || (e.target as Element).closest(".obj, .wire, .group-close")) return;
             drag.current = { moved: 0, samples: [{ x: e.clientX, y: e.clientY, at: e.timeStamp }] };
             e.currentTarget.setPointerCapture(e.pointerId);
           }}
@@ -408,10 +492,20 @@ export function LayerView({
                 />
               ))}
             </g>
+            {groupedScene && (
+              <g>
+                {(scene as GroupedScene).groups
+                  .filter((g) => g.open)
+                  .map((g) => (
+                    <OpenGroup key={g.id} group={g} onClose={() => onOpenGroup(null)} onFocus={reveal} />
+                  ))}
+              </g>
+            )}
             <g>
-              {scene.objects.map((object) => (
-                <ConceptMark key={object.id} object={object} prominence={objectProminence(object.id)} onOpen={onOpen} onFocus={reveal} />
-              ))}
+              {scene.objects.map((object) => {
+                const isGroup = closedGroups.has(object.id);
+                return <ConceptMark key={object.id} object={object} group={isGroup} prominence={objectProminence(object.id)} onOpen={isGroup ? (id) => onOpenGroup(id) : onOpen} onFocus={reveal} />;
+              })}
             </g>
             <g className="chips" aria-hidden="true">
               {scene.wires.map((wire) => (
@@ -429,6 +523,19 @@ export function LayerView({
             </g>
           </g>
         </svg>
+      )}
+      {blocked && (
+        <div className="absolute z-10" style={{ left: base.x0, bottom: canvas.height - base.y1 }}>
+          <GroupMessage
+            domain={blocked.domain}
+            count={blocked.count}
+            scale={requestedScale}
+            floor={FIT_FLOOR}
+            focusLabel={hood && conceptGroup.get(hood.id) === blocked.id ? `Focus on ${names.get(hood.id) ?? "the concept"}` : "Focus on a concept"}
+            onNarrow={onNarrow}
+            onFocus={hood && conceptGroup.get(hood.id) === blocked.id ? onFocusSelected : () => onFocusConcept(blocked.id)}
+          />
+        </div>
       )}
       <div role="group" aria-label="Zoom" className="island absolute bottom-4 z-10 flex items-center gap-1 rounded-2xl p-1" style={{ right: 16 + sheet }}>
         <button type="button" className="press zoom-btn" aria-label="Zoom out" disabled={zoom <= 1} onClick={() => zoomTo(stepZoom(zoom, -1), centre)}>

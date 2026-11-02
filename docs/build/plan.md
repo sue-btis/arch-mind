@@ -527,14 +527,14 @@ Prerequisites:
 - M09
 
 Expected create/edit areas (proposed):
-- Study UI layout: domain grouping as elk compound nodes on the layer partitions; grouped scene projection; group open and close; group and grouped-connection drawing;
+- Study UI layout: domain grouping as one node per closed group in the partitioned elk graph (ADR-010 fallback addendum, after the compound-node probe failed); grouped scene projection; group open and close; group and grouped-connection drawing;
 - the would-not-fit message gains "group by domain"; the grouped view refused with every group closed offers focus and narrower filters;
 - `architecture.dsl`: the `Study UI` container description no longer says it lays out each layer separately (review RV-003, follow-up observation 4).
 
 Acceptance:
-- AC-050 — Probe, done first: over the over-wide fixture, elk compound nodes on layer partitions, projected onto the plates, render with every group closed at Fit 0.85 or more with no horizontal scrollbar, and the scene invariants hold. For each group opened alone, the view either stays at Fit 0.85 or more with the invariants holding, or the group is reported as not fitting and stays closed (ADR-010 Verification).
+- AC-050 — Probe, done first (run on compound nodes, failed with a group open; repeated on the ADR-010 fallback, a graph of group nodes): over the over-wide fixture and a multi-domain refused fixture, the grouped view projected onto the plates render with every group closed at Fit 0.85 or more with no horizontal scrollbar, and the scene invariants hold. For each group opened alone, the view either stays at Fit 0.85 or more with the invariants holding, or the group is reported as not fitting and stays closed (ADR-010 Verification).
 - AC-051 — Each concept sits in the group of its first listed domain, or in "No domain"; each group shows its domain and concept count (BR-009, FR-048).
-- AC-052 — Relations between groups appear as one directed connection per ordered pair, each with its count and, when they share one, their type. A relation between a concept in the open group and a closed group is one connection between them, counted the same way (FR-048, ADR-010).
+- AC-052 — Relations between groups appear as one directed connection per ordered pair, with its count when it stands for two or more relations (PD-038) and, when they share one, their type. A relation between a concept in the open group and a closed group is one connection between them, counted the same way (FR-048, ADR-010).
 - AC-053 — Opening a group closes the one that was open. A group that would not fit open stays closed, and the app offers focus on one of its concepts or narrower filters. A grouped view below Fit 0.85 with every group closed is refused, offering focus and narrower filters (FR-049, ADR-010 addendum).
 - AC-054 — "Group by domain" is offered from the refused layer view and the refused matrix, the latter opening the layer view grouped (FR-047, PD-036).
 - AC-055 — Groups, connections and the open control are keyboard operable with visible focus, and the accessible list names each group and its concepts.

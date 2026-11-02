@@ -4,7 +4,7 @@ const ACTION = "press rounded-lg border border-line px-3 py-1 text-[13px] font-m
 // The matrix cannot shrink, so it reports a width; the plates shrink down to a floor, so they report a scale.
 // Neither choice is taken for the author: the buttons only start it.
 export function FitMessage(
-  props: { count: number; available: number; onNarrow: () => void; onFocusConcept: () => void } & ({ needed: number } | { scale: number; floor: number }),
+  props: { count: number; available: number; onNarrow: () => void; onFocusConcept: () => void; onGroup?: () => void } & ({ needed: number } | { scale: number; floor: number }),
 ) {
   const board = Math.round(props.available);
   return (
@@ -20,6 +20,30 @@ export function FitMessage(
         </button>
         <button type="button" className={ACTION} onClick={props.onFocusConcept}>
           Focus on a concept
+        </button>
+        {props.onGroup && (
+          <button type="button" className={ACTION} onClick={props.onGroup}>
+            Group by domain
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// A group that would not fit open stays closed; only focus and narrower filters are offered, like the grouped view refused with every group closed.
+export function GroupMessage(props: { domain: string; count: number; scale: number; floor: number; focusLabel: string; onNarrow: () => void; onFocus: () => void }) {
+  return (
+    <div data-testid="group-message" className="flex max-w-md flex-col gap-3 rounded-xl border border-line bg-panel p-4 text-[13px]">
+      <p role="status">
+        {`The ${props.domain} group has ${props.count} ${props.count === 1 ? "concept" : "concepts"} and would shrink the view to ${Math.round(props.scale * 100)} % open, below the ${Math.round(props.floor * 100)} % that keeps labels and pictograms readable, so it stays closed. ${NARROW}`}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className={ACTION} onClick={props.onNarrow}>
+          Narrow the filters
+        </button>
+        <button type="button" className={ACTION} onClick={props.onFocus}>
+          {props.focusLabel}
         </button>
       </div>
     </div>

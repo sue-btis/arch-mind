@@ -14,8 +14,10 @@ function relationProminence(hood: Neighbourhood | null, active: WireKind | null,
   return (!hood || touchesSelection) && (!active || typed) ? "near" : "far";
 }
 
-export function wireProminence(hood: Neighbourhood | null, active: WireKind | null, w: { source: string; target: string; label: string }): Prominence | undefined {
-  return relationProminence(hood, active, w.source === hood?.id || w.target === hood?.id, wireKind(w.label) === active);
+// A grouped connection stands for several relations, so it passes the legend filter when any of them has the active type.
+export function wireProminence(hood: Neighbourhood | null, active: WireKind | null, w: { source: string; target: string; label: string }, types?: string[]): Prominence | undefined {
+  const typed = types ? types.some((t) => wireKind(t) === active) : wireKind(w.label) === active;
+  return relationProminence(hood, active, w.source === hood?.id || w.target === hood?.id, typed);
 }
 
 export function cellProminence(hood: Neighbourhood | null, active: WireKind | null, row: string, col: string, relations: Relation[]): Prominence | undefined {

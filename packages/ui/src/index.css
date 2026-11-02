@@ -224,6 +224,13 @@ body {
 .obj .focus { display: none; fill: none; stroke: var(--accent); stroke-width: 2; }
 .obj:focus-visible .focus { display: inline; }
 .obj:hover .focus { display: inline; stroke-width: 1; }
+.group-box { fill: none; stroke: var(--k); stroke-opacity: 0.7; stroke-width: 1.5; stroke-dasharray: 5 4; pointer-events: none; vector-effect: non-scaling-stroke; }
+.group-close { cursor: pointer; outline: none; }
+.group-close .chip-face { fill: var(--canvas); stroke: var(--ink-muted); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.group-close text { color: var(--ink); fill: currentColor; font-size: 13px; font-weight: 600; }
+.group-close .focus { display: none; fill: none; stroke: var(--accent); stroke-width: 2; }
+.group-close:focus-visible .focus,
+.group-close:hover .focus { display: inline; }
 .nlab {
   font-size: 13px;
   fill: var(--ink);
