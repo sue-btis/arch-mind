@@ -77,14 +77,14 @@ export function pictogramFor(concept: Concept): string {
 
 const markId = (layer: Layer) => `mark:${layer}`;
 
-export async function layoutConcepts(concepts: Concept[]): Promise<PlateLayout> {
+// `names` lets a subset of the shown concepts keep the designators of the whole shown set.
+export async function layoutConcepts(concepts: Concept[], names = designators(concepts)): Promise<PlateLayout> {
   const ids = new Set(concepts.map((c) => c.id));
   const relations = concepts.flatMap((c) =>
     c.relations
       .filter((r) => ids.has(r.to) && r.to !== c.id)
       .map((r) => ({ from: c.id, to: r.to, label: r.type, citation: r.source, explanation: r.explanation })),
   );
-  const names = designators(concepts);
   const cell = (id: string, layer: Layer) => ({
     id,
     width: CELL_WIDTH,

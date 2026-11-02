@@ -5,6 +5,8 @@ import { ConceptDetail, SHEET_WIDTH } from "./ConceptDetail.tsx";
 import { ConceptList } from "./ConceptList.tsx";
 import { NO_FILTERS, filterConcepts, type Filters } from "./filter.ts";
 import { Finder } from "./Finder.tsx";
+import { focusedConcepts } from "./focus.ts";
+import { FocusPill } from "./FocusPill.tsx";
 import { clearHidingFacets } from "./finder.ts";
 import { designators } from "./layout.ts";
 import { LayerView } from "./LayerView.tsx";
@@ -46,6 +48,9 @@ export function App() {
   const [selected, setSelected] = useState<string | null>(null);
   const [wireType, setWireType] = useState<WireKind | null>(null);
   const [finderOpen, setFinderOpen] = useState(false);
+  // Focus is a state of the layer view only: it lives here, in memory, and ends with the selection.
+  const [focused, setFocused] = useState(false);
+  const [announcement, setAnnouncement] = useState("");
   const [canvas, setCanvas] = useState({ width: 0, height: 0 });
   // The plates stay mounted behind Review only once they have been shown, so opening Review first never pays for a layout.
   const [platesShown, setPlatesShown] = useState(false);
@@ -54,6 +59,7 @@ export function App() {
   const switcher = useRef<HTMLDivElement>(null);
   const opener = useRef<HTMLElement | SVGElement | null>(null);
   const finderFrom = useRef<HTMLElement | SVGElement | null>(null);
+  const focusOnChoose = useRef(false);
 
   useEffect(() => {
     Promise.all([
@@ -86,6 +92,8 @@ export function App() {
   }, [data, view]);
 
   const hood = useMemo(() => (selected ? neighbourhood(shown, selected) : null), [shown, selected]);
+  const focusSet = useMemo(() => (focused && selected ? focusedConcepts(shown, selected) : null), [focused, shown, selected]);
+  const focusActive = focusSet !== null && focusSet.length > 0;
   // The drawer can name a concept the filters hide, so it falls back to the numbering of the whole store.
   const names = useMemo(() => new Map([...designators(data?.concepts ?? []), ...designators(shown)]), [data, shown]);
 
@@ -115,12 +123,47 @@ export function App() {
   }, []);
 
   const inReview = view === "review";
+  const startFocus = useCallback(() => {
+    setFocused(true);
+    setView((v) => (v === "matrix" ? "layers" : v));
+  }, []);
+  const exitFocus = useCallback(() => setFocused(false), []);
+  // Focus is a state of the layer view, so leaving it for the matrix or Review ends it.
+  const changeView = (next: View) => {
+    if (next !== "layers") setFocused(false);
+    setView(next);
+  };
+
+  // Clearing the selection, or filters that hide the focused concept, leave focus; it must not resume with the next selection.
+  useEffect(() => {
+    if (focused && !focusActive) setFocused(false);
+  }, [focused, focusActive]);
+
+  const wasFocused = useRef(false);
+  const focusName = selected ? `${names.get(selected) ?? ""} ${titles.get(selected) ?? selected}`.trim() : "";
+  useEffect(() => {
+    if (focusActive) setAnnouncement(`Focused on ${focusName}`);
+    else if (wasFocused.current) setAnnouncement("Focus ended");
+    wasFocused.current = focusActive;
+    // Moving focus to another concept is not a start or an end, so the name stays out of the dependencies.
+  }, [focusActive]);
   const closeFinder = useCallback(() => {
     setFinderOpen(false);
+    focusOnChoose.current = false;
     const from = finderFrom.current;
     finderFrom.current = null;
     if (from?.isConnected) from.focus();
   }, []);
+  const openFinder = (forFocus: boolean) => {
+    const active = document.activeElement;
+    finderFrom.current = active instanceof HTMLElement || active instanceof SVGElement ? active : null;
+    focusOnChoose.current = forFocus;
+    setFinderOpen(true);
+  };
+  const narrowFilters = () => {
+    setFiltersOpen(true);
+    document.querySelector<HTMLElement>('aside[aria-label="Filters"] button')?.focus();
+  };
 
   const choose = (id: string) => {
     const chosen = data?.concepts.find((c) => c.id === id);
@@ -130,6 +173,8 @@ export function App() {
     setFilters(clearHidingFacets(chosen, filters));
     setSelected(id);
     setFinderOpen(false);
+    if (focusOnChoose.current) startFocus();
+    focusOnChoose.current = false;
     // A drawer already open on this concept would not move focus by itself.
     if (id === selected) document.querySelector<HTMLElement>('[data-testid="concept-detail"]')?.focus();
   };
@@ -140,14 +185,18 @@ export function App() {
         if (inReview) return;
         e.preventDefault();
         if (finderOpen) return closeFinder();
-        const active = document.activeElement;
-        finderFrom.current = active instanceof HTMLElement || active instanceof SVGElement ? active : null;
-        setFinderOpen(true);
-      } else if (e.key === "Escape" && !finderOpen && !selected) setWireType(null);
+        openFinder(false);
+      } else if (e.key === "Escape" && !finderOpen && !e.defaultPrevented) {
+        if (focused) exitFocus();
+        else if (!selected) setWireType(null);
+      } else if (e.key.toLowerCase() === "f" && !e.ctrlKey && !e.metaKey && !e.altKey && selected && !inReview && !finderOpen && !(e.target instanceof Element && e.target.closest("input, textarea, select, [contenteditable]"))) {
+        startFocus();
+      }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [closeFinder, inReview, finderOpen, selected]);
+    // openFinder only writes refs and a setter, so a stale copy behaves the same.
+  }, [closeFinder, exitFocus, startFocus, focused, inReview, finderOpen, selected]);
 
   // The part of the canvas the islands leave free. The detail sheet narrows it from the right without refitting the view.
   const base: Box = {
@@ -166,10 +215,10 @@ export function App() {
         <PictogramDefs />
       </svg>
       <div ref={board} className="canvas-dots absolute inset-0" data-testid="board" data-view={view}>
-        {data && (view === "layers" || (inReview && platesShown)) && <LayerView concepts={shown} canvas={canvas} base={base} sheet={sheet} hood={hood} wireType={wireType} away={inReview} onOpen={open} onClear={close} />}
+        {data && (view === "layers" || (inReview && platesShown)) && <LayerView concepts={focusSet ?? shown} names={names} canvas={canvas} base={base} sheet={sheet} hood={hood} wireType={wireType} away={inReview} onOpen={open} onClear={close} onNarrow={narrowFilters} onFocusConcept={() => openFinder(true)} />}
         {data && view === "matrix" && (
           <div className="absolute inset-0 overflow-auto" style={scroller} onClick={clearOnEmpty}>
-            <MatrixView concepts={shown} boardWidth={base.x1 - base.x0} hood={hood} wireType={wireType} onOpen={open} />
+            <MatrixView concepts={shown} boardWidth={base.x1 - base.x0} hood={hood} wireType={wireType} onOpen={open} onNarrow={narrowFilters} onFocusConcept={() => openFinder(true)} />
           </div>
         )}
         {inReview && (
@@ -188,7 +237,7 @@ export function App() {
               key={v}
               type="button"
               aria-pressed={view === v}
-              onClick={() => setView(v)}
+              onClick={() => changeView(v)}
               className={`press relative rounded-lg px-3 py-1 text-[13px] ${view === v ? "text-on-accent" : "text-ink-muted hover:text-ink"}`}
             >
               {VIEW_LABELS[v]}
@@ -208,6 +257,11 @@ export function App() {
         </div>
       )}
 
+      {focusActive && <FocusPill designator={selected ? names.get(selected) ?? "" : ""} title={selected ? titles.get(selected) ?? selected : ""} sheet={sheet} onExit={exitFocus} />}
+      <p role="status" aria-live="polite" className="sr-only">
+        {announcement}
+      </p>
+
       {error && (
         <p role="alert" className="island absolute left-1/2 top-4 z-10 -translate-x-1/2 rounded-2xl px-4 py-2.5 text-correction">
           Could not load concepts: {error}
@@ -221,7 +275,7 @@ export function App() {
       )}
       {data && <WireLegend away={inReview} active={wireType} onChange={setWireType} />}
       {finderOpen && data && <Finder concepts={data.concepts} onChoose={choose} onClose={closeFinder} />}
-      {selected && data && <ConceptDetail id={selected} concepts={data.concepts} names={names} onSelect={setSelected} onClose={close} />}
+      {selected && data && <ConceptDetail id={selected} concepts={data.concepts} names={names} focused={focusActive} canFocus={!inReview} onSelect={setSelected} onToggleFocus={focusActive ? exitFocus : startFocus} onClose={close} />}
     </main>
   );
 }

@@ -59,14 +59,20 @@ export function useRelationPopover(container: RefObject<HTMLElement | null>) {
 
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: globalThis.KeyboardEvent) => e.key === "Escape" && setOpen(null);
+    // Captured so a pinned popover is the first layer an Escape closes; the app and the drawer skip a handled event.
+    // A modal (the finder) owns its own Escape.
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key !== "Escape" || document.querySelector('[aria-modal="true"]')) return;
+      if (open.pinned) e.preventDefault();
+      setOpen(null);
+    };
     const onDown = (e: globalThis.PointerEvent) => {
       if (open.pinned && !(e.target as Element).closest("[data-relation-target]")) setOpen(null);
     };
-    document.addEventListener("keydown", onKey);
+    document.addEventListener("keydown", onKey, true);
     document.addEventListener("pointerdown", onDown);
     return () => {
-      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("keydown", onKey, true);
       document.removeEventListener("pointerdown", onDown);
     };
   }, [open]);
