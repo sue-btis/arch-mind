@@ -12,7 +12,7 @@ export function hasFilters(f: Filters): boolean {
   return f.layers.length + f.domains.length + f.concerns.length > 0;
 }
 
-const anyOf = (selected: string[], values: string[]) => selected.length === 0 || values.some((v) => selected.includes(v));
+export const anyOf = (selected: string[], values: string[]) => selected.length === 0 || values.some((v) => selected.includes(v));
 
 export function matchesFilters(c: Concept, f: Filters): boolean {
   return anyOf(f.layers, [c.layer]) && anyOf(f.domains, c.domains) && anyOf(f.concerns, c.concerns);

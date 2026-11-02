@@ -94,4 +94,19 @@ describe("architecture rules", () => {
     expect([...symbols].sort()).toEqual([...catalog].sort());
     for (const layer of LAYERS) expect(symbols).toContain(layer);
   });
+
+  it("TST-039: the finder, legend filter and prominence modules never write or keep state outside memory", () => {
+    // M09 and M10 add their navigation modules here.
+    const navigationModules = ["ui/src/finder.ts", "ui/src/Finder.tsx", "ui/src/prominence.ts", "ui/src/Sidebar.tsx"];
+    const nonGetFetch = /\bfetch\s*\([^)]*\bmethod\s*:\s*["'`](?!get["'`])/i;
+    const browserStorage = /\b(localStorage|sessionStorage|indexedDB)\b/;
+    const violations = (text: string) => [nonGetFetch.test(text) && "non-GET fetch", browserStorage.test(text) && "browser storage"].filter(Boolean);
+
+    expect(violations('fetch("/api/x", { method: "POST" })')).toEqual(["non-GET fetch"]);
+    expect(violations('fetch("/api/x", { method: "GET" })')).toEqual([]);
+    expect(violations("window.localStorage.setItem(a, b)")).toEqual(["browser storage"]);
+
+    const offenders = navigationModules.flatMap((module) => violations(readFileSync(join(packagesDir, module), "utf8")).map((v) => `${module}: ${v}`));
+    expect(offenders).toEqual([]);
+  });
 });

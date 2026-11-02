@@ -1,9 +1,11 @@
 import type { Concept } from "@arch-mind/rules/model";
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { FitMessage } from "./FitMessage.tsx";
 import type { OpenConcept } from "./LayerView.tsx";
 import type { Neighbourhood } from "./neighbourhood.ts";
 import { CELL_SIZE, ROW_HEADER_WIDTH, buildMatrix, matrixWidth } from "./matrix.ts";
+import { cellProminence, type WireKind } from "./prominence.ts";
+import { prefersReducedMotion } from "./camera.ts";
 import { RelationPopover, useRelationPopover, type RelationTargetProps } from "./Popover.tsx";
 import { wireAbbrev, wireCode, wireStyle, type WireCode } from "./wire-code.ts";
 
@@ -11,11 +13,13 @@ export function MatrixView({
   concepts,
   boardWidth,
   hood,
+  wireType,
   onOpen,
 }: {
   concepts: Concept[];
   boardWidth: number;
   hood: Neighbourhood | null;
+  wireType: WireKind | null;
   onOpen: OpenConcept;
 }) {
   const matrix = useMemo(() => buildMatrix(concepts), [concepts]);
@@ -23,10 +27,15 @@ export function MatrixView({
   const { open, targetProps } = useRelationPopover(container);
   const needed = matrixWidth(matrix.headers.length);
 
+  // The matrix has no camera, so a new selection (a finder choice included) brings its row into view.
+  useEffect(() => {
+    const row = container.current?.querySelector('[aria-current="true"]')?.closest("tr");
+    row?.scrollIntoView({ block: "nearest", behavior: prefersReducedMotion() ? "instant" : "smooth" });
+  }, [hood?.id]);
+
   if (boardWidth > 0 && needed > boardWidth) return <FitMessage count={concepts.length} needed={needed} available={boardWidth} />;
   const near = hood ? new Set([hood.id, ...hood.connected]) : null;
   const headerState = (id: string) => (!hood || !near ? undefined : id === hood.id ? "selected" : near.has(id) ? "near" : "far");
-  const cellState = (row: string, col: string) => (!hood ? undefined : row === hood.id || col === hood.id ? "near" : "far");
   const label = (i: number) => `${matrix.headers[i]!.designator} ${matrix.headers[i]!.title}`;
 
   return (
@@ -59,7 +68,7 @@ export function MatrixView({
         </thead>
         <tbody>
           {matrix.headers.map((row, r) => (
-            <tr key={row.id}>
+            <tr key={row.id} className="scroll-my-18">
               <th scope="row" data-state={headerState(row.id)} className="border border-line p-0 text-left font-normal">
                 <button
                   type="button"
@@ -76,7 +85,7 @@ export function MatrixView({
               {matrix.headers.map((col, c) => {
                 const relations = matrix.cells[r]![c]!;
                 return (
-                  <td key={col.id} data-state={cellState(row.id, col.id)} className="h-8 border border-line p-0 text-center">
+                  <td key={col.id} data-state={cellProminence(hood, wireType, row.id, col.id, relations)} className="h-8 border border-line p-0 text-center">
                     {relations.length > 0 && (
                       <RelationCell
                         label={`${relations.map((x) => x.type).join(", ")}: ${label(r)} to ${label(c)}`}

@@ -23,6 +23,7 @@ import {
   type SceneObject,
   type SceneWire,
 } from "./plates.ts";
+import { wireProminence as prominenceOfWire, type Prominence, type WireKind } from "./prominence.ts";
 import { RelationPopover, useRelationPopover, type RelationInfo, type RelationTargetProps } from "./Popover.tsx";
 import { wireCode, wireStyle } from "./wire-code.ts";
 
@@ -37,7 +38,6 @@ const MARKER_CODES = ["requires", "complements", "contains", "alternative", "oth
 const MEANING = new Map(PICTOGRAMS.map((p) => [p.id, p.meaning]));
 
 export type OpenConcept = (id: string, opener: HTMLElement | SVGElement) => void;
-type Prominence = "selected" | "near" | "far";
 
 const layerStyle = (layer: string): CSSProperties => ({ "--k": `var(--layer-${layer})` }) as CSSProperties;
 const polyline = (points: Point[]) => points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
@@ -138,6 +138,7 @@ export function LayerView({
   base,
   sheet,
   hood,
+  wireType,
   away,
   onOpen,
   onClear,
@@ -148,6 +149,7 @@ export function LayerView({
   base: Box;
   sheet: number;
   hood: Neighbourhood | null;
+  wireType: WireKind | null;
   // Review hides the plates and their zoom island, but keeps the camera where the user left it.
   away: boolean;
   onOpen: OpenConcept;
@@ -299,7 +301,7 @@ export function LayerView({
 
   const near = hood ? new Set([hood.id, ...hood.connected]) : null;
   const objectProminence = (id: string): Prominence | undefined => (!hood || !near ? undefined : id === hood.id ? "selected" : near.has(id) ? "near" : "far");
-  const wireProminence = (w: SceneWire): Prominence | undefined => (!hood ? undefined : w.source === hood.id || w.target === hood.id ? "near" : "far");
+  const wireProminence = (w: SceneWire) => prominenceOfWire(hood, wireType, w);
   const plateProminence = (layer: string): Prominence | undefined =>
     !near ? undefined : scene?.objects.some((o) => o.layer === layer && near.has(o.id)) ? "near" : "far";
 

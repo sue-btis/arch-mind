@@ -2,6 +2,7 @@ import type { FileProblem, Layer } from "@arch-mind/rules/model";
 import type { ReactNode } from "react";
 import { Pictogram } from "./pictogram-art.tsx";
 import { NO_FILTERS, hasFilters, type Filters } from "./filter.ts";
+import type { WireKind } from "./prominence.ts";
 import { WIRE_LEGEND, wireAbbrev, wireStyle } from "./wire-code.ts";
 
 export interface FacetCatalog {
@@ -105,30 +106,32 @@ export function Sidebar({
   );
 }
 
-export function WireLegend({ away }: { away: boolean }) {
+const LEGEND_TYPES: { kind: WireKind; type: string }[] = [...WIRE_LEGEND.map(({ code, type }) => ({ kind: code, type })), { kind: "other", type: "any other type" }];
+
+export function WireLegend({ away, active, onChange }: { away: boolean; active: WireKind | null; onChange: (kind: WireKind | null) => void }) {
   return (
-    <section aria-labelledby="wires-title" data-away={away || undefined} inert={away} className="island absolute bottom-4 left-4 z-10 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-2xl px-3 py-2 text-[13px]">
-      <h2 id="wires-title" className={LABEL}>
+    <section aria-labelledby="wires-title" data-away={away || undefined} data-isolating={active ? "" : undefined} inert={away} className="island legend absolute bottom-4 left-4 z-10 flex flex-wrap items-center gap-x-1 gap-y-1 rounded-2xl px-2 py-1.5 text-[13px]">
+      <h2 id="wires-title" className={`px-1.5 ${LABEL}`}>
         Wires
       </h2>
-      {WIRE_LEGEND.map(({ code, type }) => {
-        const { stroke, strokeDasharray } = wireStyle(code);
+      {LEGEND_TYPES.map(({ kind, type }) => {
+        const { stroke, strokeDasharray } = wireStyle(kind === "other" ? null : kind);
         return (
-          <span key={code} className="flex items-center gap-2">
+          <button key={kind} type="button" aria-pressed={active === kind} aria-label={type} className="press legend-btn flex items-center gap-2 rounded-[10px] px-2 py-1" onClick={() => onChange(active === kind ? null : kind)}>
             <svg width="20" height="8" aria-hidden="true" className="shrink-0">
               <line x1="0" y1="4" x2="20" y2="4" stroke={stroke} strokeWidth="2" strokeDasharray={strokeDasharray} />
             </svg>
-            <span className="text-[11px] font-semibold text-ink-muted">{wireAbbrev(code)}</span>
-            {type}
-          </span>
+            {kind !== "other" && (
+              <span aria-hidden="true" className="legend-sub text-[11px] font-semibold text-ink-muted">
+                {wireAbbrev(kind)}
+              </span>
+            )}
+            <span aria-hidden="true" className={kind === "other" ? "legend-sub text-ink-muted" : undefined}>
+              {type}
+            </span>
+          </button>
         );
       })}
-      <span className="flex items-center gap-2 text-ink-muted">
-        <svg width="20" height="8" aria-hidden="true" className="shrink-0">
-          <line x1="0" y1="4" x2="20" y2="4" stroke="var(--wire)" strokeWidth="2" />
-        </svg>
-        any other type
-      </span>
     </section>
   );
 }
