@@ -1,0 +1,29 @@
+%% Navigation at scale (J-002): the app refuses a view that would not fit and offers ways out; it never takes one on its own (FR-023, FR-047, PD-031).
+flowchart TD
+  F[Author sets filters] --> V0{Which view?}
+  V0 -- layers --> W{Fit scale at least 0.85?}
+  V0 -- matrix --> WM{Matrix fits the free width?}
+  W -- yes --> V[Layer view at Fit]
+  WM -- yes --> MX[Matrix view]
+  W -- no --> M[Message: the view would not fit, with three choices]
+  WM -- no --> M
+  M -- narrower filters --> F
+  M -- focus on a concept --> P[Author picks a concept; from the matrix this opens the layer view, FR-047]
+  P --> X[Focus: only its neighbourhood is drawn, FR-045]
+  M -- group by domain --> GW{Grouped view fits with every group closed?}
+  GW -- yes --> G[Grouped layer view: one group per first-listed domain per plate, BR-009]
+  GW -- no --> M2[Message: offers focus or narrower filters only]
+  M2 -- narrower filters --> F
+  M2 -- focus on a concept --> P
+  G -- open a group --> OF{Fits with only this group open?}
+  OF -- yes --> O[The open group closes; this group shows its concepts and relations in place, FR-048, FR-049]
+  OF -- no --> OM[Group stays closed; message offers focus on one of its concepts or narrower filters, FR-049]
+  OM -- focus on a concept --> P
+  OM -- narrower filters --> F
+  O -- close it --> G
+  X -- leave focus --> F
+  G -- leave grouping --> F
+  V -- Ctrl K finder over the whole store --> S[Chosen concept becomes the selection and is brought into view; filters that hide it are cleared, FR-043]
+  MX -- Ctrl K finder over the whole store --> S
+  V -- choose a type in the legend --> L[That relation type stays prominent, others recede; with a selection, only its neighbourhood of that type, FR-044]
+  L -- choose it again --> V

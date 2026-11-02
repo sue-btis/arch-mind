@@ -1,6 +1,6 @@
 # arch-mind Build Plan
 
-Baseline: RV-002 (M01 to M04 were planned and built against RV-001; Phase 2 milestones M05 to M07 plan against RV-002)
+Baseline: RV-003 (M01 to M04 were planned and built against RV-001; Phase 2 milestones M05 to M07 plan against RV-002; Phase 3 milestones M08 to M10 plan against RV-003)
 Change folders: docs/changes/; milestone folders are named YYYY-MM-DD-Mxx-<slug>
 
 Milestone status (no status is stored in this plan):
@@ -21,6 +21,8 @@ M02 and M03 then grow capture and views independently; M04 adds review on top of
 
 Phase 2 (PRD §12) adds three slices. M05 proves the riskiest Phase 2 assumption first: the own SVG plates renderer (ADR-008) draws the TST-032 chain at the reference width with a Fit scale of at least 0.85, with pictograms from the library and the layer pictogram as fallback. M06 then makes the map respond to selection with the relation drawer, which answers the P0 finding of the 2026-11-01 UX critique. M07 adds the pictogram and illustration proposals to capture (ADR-009). Order M06 before M07: author, 2026-11-01, «Selection first (Recommended)».
 
+Phase 3 (PRD §12) adds three slices, built before M07: author, 2026-11-01, «Fase 3 primero (Recommended)». Nothing external blocks them, while M07 waits on the author's timed captures. The cut into three is the author's, «Sí, M08–M10 (Recommended)». M08 delivers the finder and the legend type filter, the smallest slice that most improves daily use. M09 adds focus and searchable facet filters and makes the would-not-fit message offer narrower filters or focus, from the layer view and the matrix. M10 adds the grouped layer view. It starts with the ADR-010 probe of elk compound nodes on layer partitions, the riskiest Phase 3 assumption, and falls back to a graph of group nodes if the probe fails.
+
 ## Architecture Proof Slice
 Milestone: M01
 Why this is the smallest useful end-to-end proof:
@@ -38,8 +40,11 @@ graph LR
   M05 --> M06
   M05 --> M07
   M06 --> M07
+  M06 --> M08
+  M08 --> M09
+  M09 --> M10
 ```
-M07 depends on M05 for the pictogram catalog and on M06 for the drawer that shows the illustration.
+M07 depends on M05 for the pictogram catalog and on M06 for the drawer that shows the illustration. M08 builds on the M06 selection; M09 reuses the M08 finder to pick a concept to focus on; M10 adds the third way out to the M09 message.
 
 ## Milestone M01 — A concept captured from Claude Code appears in the layer view
 
@@ -410,6 +415,147 @@ Stop if:
 - implementation requires changing a frozen product behavior or an accepted ADR;
 - required scope expands beyond this milestone.
 
+## Milestone M08 — Finder and legend type filter
+
+Goal:
+From the keyboard, the author opens a finder, types part of a concept's title or designator and chooses a match among every concept in the store. The chosen concept becomes the selection and is brought into view, with the filters that hide it cleared. Choosing a relation type in the wire legend keeps that type prominent and lets the rest recede; with a selection, only what is both in the neighbourhood and of that type stays prominent; choosing the type again restores every relation.
+
+Requirements:
+- FR-043, FR-044
+- FR-039, FR-041 (combined with the legend type filter)
+
+Canonical authorities:
+- `docs/design/domain.md` (Finder, Legend type filter, Selection / neighbourhood)
+- `docs/design/architecture/architecture.dsl` (`navigation` component and its relationships)
+- `docs/design/ux/scale-flow.mmd` (finder and legend branches)
+- `docs/design/architecture/quality-attributes.md` (architecture rule: navigation derives, never stores)
+- PRD §15 PD-028, PD-037
+
+Prerequisites:
+- M06
+
+Expected create/edit areas (proposed):
+- Study UI: finder dialog and its keyboard shortcut, legend entries as toggle controls, a shared prominence rule combining the selection and the legend type;
+- `DESIGN.md`: replace the "Deferred … Ctrl K finder and legend type isolation" line (`DESIGN.md:164`, review RV-003 F-024) with the shipped finder and legend rules.
+
+Acceptance:
+- AC-042 — The finder opens from the keyboard and matches by title or designator, and only those (no SEE-I text). It lists matches from every concept in the store. Choosing one makes it the selection and brings it into view. When the filters hide it, they are cleared first (FR-043, PD-037).
+- AC-043 — Choosing a relation type in the legend keeps relations of that type prominent and makes the others recede. Choosing it again restores every relation. With a selection, only relations both in the neighbourhood and of that type stay prominent (FR-044, FR-039).
+- AC-044 — The finder and the legend toggles are operable by keyboard with visible focus, and their active text meets WCAG 2.2 AA (PRODUCT.md accessibility).
+
+Tests:
+- TST-036 — Finder unit tests: match by title and by designator, no match on SEE-I text, results from the whole store (AC-042).
+- TST-037 — End-to-end: open the finder from the keyboard, choose a filtered-out concept, filters cleared, concept selected and in view (AC-042, AC-044).
+- TST-038 — End-to-end: legend type on and off, with and without a selection (AC-043, AC-044).
+- TST-039 — Architecture rule "navigation derives, never stores": the finder, legend filter, focus and grouping modules make no API write call and use no persistent storage (`quality-attributes.md` architecture rules; first created here, extended by M09 and M10).
+
+Quality gates:
+- type check, lint, tests pass; package check passes.
+
+Completion evidence:
+- TST-036 to TST-039 output; screenshots of the finder and of a legend type with a selection, light and dark.
+
+Stop if:
+- clearing the filters to show the chosen concept makes the view refused (FR-023): settle in the milestone spec whether the finder clears every filter or only the facets that hide the concept, and what the author sees then (review RV-003, follow-up observation 2);
+- implementation requires changing a frozen product behavior or an accepted ADR;
+- required scope expands beyond this milestone.
+
+## Milestone M09 — Focus, searchable filters and the would-not-fit choices
+
+Goal:
+When a view would not fit, the app says so and offers narrower filters or focusing on a concept, and takes neither on its own. From the matrix, narrower filters keep the matrix and focus opens the layer view focused. Focus draws only the selection's neighbourhood until the author leaves it. A facet group whose values do not fit the filters without scrolling gets a field that narrows its values, and chosen values stay visible.
+
+Requirements:
+- FR-023 (as amended), FR-045, FR-046, FR-047 (narrower filters and focus; grouping arrives in M10)
+- NFR-001 (focus part of the Phase 3 acceptance)
+
+Canonical authorities:
+- `docs/design/domain.md` (Focus, View)
+- `docs/design/ux/scale-flow.mmd` (refusal, matrix branch, focus)
+- `docs/design/architecture/quality-attributes.md` (NFR-001 row, Phase 3 acceptance)
+- `docs/design/architecture/adr/ADR-008-layer-plates-renderer.md` (Fit floor, refusal with the FR-047 ways out)
+- PRD §15 PD-030, PD-031, PD-036
+
+Prerequisites:
+- M08
+
+Expected create/edit areas (proposed):
+- Study UI: would-not-fit message with its choices for the layer view and the matrix; focus state on the layer view; searchable facet groups in the filters island;
+- `DESIGN.md`: the fit message no longer only "asks for narrower filters" (`DESIGN.md:227`, review RV-003 F-024).
+
+Acceptance:
+- AC-045 — A layer view or matrix view that would not fit shows a message offering narrower filters and focus on a concept; the app takes neither on its own. From the matrix, narrower filters keep the matrix and focus opens the layer view focused (FR-023, FR-047, PD-031, PD-036).
+- AC-046 — Focus on the selected concept draws only that concept, its incoming and outgoing relations and the concepts they connect; leaving focus restores the filtered view (FR-045, PD-030).
+- AC-047 — The over-wide fixture that the layer view refuses renders focused on one of its concepts at Fit 0.85 or more at 1366 × 768 with no horizontal scrollbar (NFR-001).
+- AC-048 — A facet group whose values do not fit without scrolling shows a field that narrows the values to those matching the typed text; chosen values stay visible; groups that fit show no field (FR-046).
+- AC-049 — Every new control is keyboard operable with visible focus, and its active text meets WCAG 2.2 AA.
+
+Tests:
+- TST-040 — Focus unit tests: the focused set equals the M06 neighbourhood over the shown concepts, including cross-layer and isolated cases (AC-046).
+- TST-041 — End-to-end: the refused layer view and the refused matrix each offer the two choices; focus from the matrix opens the layer view focused; the over-wide fixture renders focused at Fit 0.85 or more (AC-045, AC-047).
+- TST-042 — End-to-end: a facet with many values shows the search field, narrows, keeps chosen values; a short facet shows none (AC-048, AC-049).
+
+Quality gates:
+- type check, lint, tests pass; package check passes.
+
+Completion evidence:
+- TST-040 to TST-042 output; screenshots of the would-not-fit message (layer view and matrix) and of a focused view, light and dark.
+
+Stop if:
+- implementation requires changing a frozen product behavior or an accepted ADR;
+- required scope expands beyond this milestone.
+
+## Milestone M10 — Layer view grouped by domain
+
+Goal:
+From the would-not-fit message the author can also group the layer view by domain. Each plate then shows one group per first-listed domain (or "No domain") with its concept count. Relations between groups appear as one directed connection per ordered pair, each with the number of relations it stands for. Opening a group closes the open one and shows its concepts and their relations in place. A group that would not fit open stays closed, and the app offers focus on one of its concepts or narrower filters.
+
+Requirements:
+- FR-047 (the third way out), FR-048, FR-049, BR-009
+- NFR-001 (grouped part of the Phase 3 acceptance)
+
+Canonical authorities:
+- `docs/design/architecture/adr/ADR-010-grouped-layer-view-layout.md` and its addendum
+- `docs/design/architecture/adr/ADR-008-layer-plates-renderer.md` (addendum "One elk graph": projection, gap drops, scene invariants)
+- `docs/design/domain.md` (Group, Grouped layer view)
+- `docs/design/data/concept.schema.json` (domain order)
+- `docs/design/ux/scale-flow.mmd` (grouping branch)
+- `docs/design/architecture/quality-attributes.md` (Phase 3 acceptance; rule "groups and routes come from elk")
+- PRD §15 PD-029, PD-032, PD-033, PD-035
+
+Prerequisites:
+- M09
+
+Expected create/edit areas (proposed):
+- Study UI layout: domain grouping as elk compound nodes on the layer partitions; grouped scene projection; group open and close; group and grouped-connection drawing;
+- the would-not-fit message gains "group by domain"; the grouped view refused with every group closed offers focus and narrower filters;
+- `architecture.dsl`: the `Study UI` container description no longer says it lays out each layer separately (review RV-003, follow-up observation 4).
+
+Acceptance:
+- AC-050 — Probe, done first: over the over-wide fixture, elk compound nodes on layer partitions, projected onto the plates, render with every group closed at Fit 0.85 or more with no horizontal scrollbar, and the scene invariants hold. For each group opened alone, the view either stays at Fit 0.85 or more with the invariants holding, or the group is reported as not fitting and stays closed (ADR-010 Verification).
+- AC-051 — Each concept sits in the group of its first listed domain, or in "No domain"; each group shows its domain and concept count (BR-009, FR-048).
+- AC-052 — Relations between groups appear as one directed connection per ordered pair, each with its count and, when they share one, their type. A relation between a concept in the open group and a closed group is one connection between them, counted the same way (FR-048, ADR-010).
+- AC-053 — Opening a group closes the one that was open. A group that would not fit open stays closed, and the app offers focus on one of its concepts or narrower filters. A grouped view below Fit 0.85 with every group closed is refused, offering focus and narrower filters (FR-049, ADR-010 addendum).
+- AC-054 — "Group by domain" is offered from the refused layer view and the refused matrix, the latter opening the layer view grouped (FR-047, PD-036).
+- AC-055 — Groups, connections and the open control are keyboard operable with visible focus, and the accessible list names each group and its concepts.
+
+Tests:
+- TST-043 — Probe test over the over-wide fixture: Fit and scene invariants with every group closed and with each group open alone (AC-050). The invariant set is the full scene check in `DESIGN.md` (Board Grid Rule), which includes the plate-edge run and lane spacing, and is a superset of the ADR-008 addendum list (review RV-003, follow-up observation 3).
+- TST-044 — Grouping unit tests: first-listed domain, "No domain", counts, directed ordered pairs, concept-to-closed-group connections (AC-051, AC-052).
+- TST-045 — End-to-end: group from the layer view and from the matrix, open and close groups, a group too big to open, the grouped view refused with every group closed (AC-053, AC-054, AC-055).
+- TST-046 — Architecture rule "groups and routes come from elk": the scene invariants run over grouped scenes, and no hand-written router exists (`quality-attributes.md` architecture rules).
+
+Quality gates:
+- type check, lint, tests pass; package check passes.
+
+Completion evidence:
+- TST-043 to TST-046 output; the probe's measured Fit for every group state; screenshots of the grouped view closed and with one group open, light and dark.
+
+Stop if:
+- the AC-050 probe fails either check: stop, report the measurements, and return to ADR-010 to fall back to a graph of group nodes (Option A) through its revisit trigger, with the author;
+- implementation requires changing a frozen product behavior or an accepted ADR;
+- required scope expands beyond this milestone.
+
 ## Requirement Coverage Matrix
 | Requirement | Milestone(s) | Acceptance | Tests |
 |---|---|---|---|
@@ -436,7 +582,7 @@ Stop if:
 | FR-020 | M01, M05 | AC-004, AC-024 | TST-008, TST-022 |
 | FR-021 | M03, M06 | AC-014, AC-030 | TST-013, TST-027 |
 | FR-022 | M03 | AC-013 | TST-013 |
-| FR-023 | M03, M05 | AC-015, AC-026 | TST-014, TST-022, TST-023 |
+| FR-023 | M03, M05, M09 | AC-015, AC-026, AC-045 | TST-014, TST-022, TST-023, TST-041 |
 | FR-024 | M03, M06 | AC-016, AC-030 | TST-015, TST-027 |
 | FR-025 | M03, M06, M07 | AC-016, AC-030, AC-039 | TST-015, TST-027, TST-033 |
 | FR-026 | M04 | AC-018 | TST-018 |
@@ -455,7 +601,14 @@ Stop if:
 | FR-040 | M06 | AC-030, AC-031 | TST-026, TST-027 |
 | FR-041 | M06 | AC-032 | TST-027 |
 | FR-042 | M05 | AC-027 | TST-023 |
-| NFR-001 | M01, M03, M05 | AC-005, AC-015, AC-026 | TST-008, TST-014, TST-023 |
+| FR-043 | M08 | AC-042, AC-044 | TST-036, TST-037 |
+| FR-044 | M08 | AC-043, AC-044 | TST-038 |
+| FR-045 | M09 | AC-046, AC-047 | TST-040, TST-041 |
+| FR-046 | M09 | AC-048 | TST-042 |
+| FR-047 | M09, M10 | AC-045, AC-054 | TST-041, TST-045 |
+| FR-048 | M10 | AC-051, AC-052 | TST-044 |
+| FR-049 | M10 | AC-050, AC-053 | TST-043, TST-045 |
+| NFR-001 | M01, M03, M05, M09, M10 | AC-005, AC-015, AC-026, AC-047, AC-050 | TST-008, TST-014, TST-023, TST-041, TST-043 |
 | NFR-002 | M02, M07 | AC-011, AC-040 | timing log |
 | NFR-003 | M01, M07 | AC-001, AC-037 | TST-004, TST-031 |
 | NFR-004 | M01, M07 | AC-007, AC-041 | TST-001, TST-035 |
@@ -469,7 +622,8 @@ Stop if:
 | BR-006 | M04 | AC-020 | TST-016 |
 | BR-007 | M04 | AC-022 | TST-017 |
 | BR-008 | M05, M07 | AC-025, AC-038 | TST-021, TST-029 |
+| BR-009 | M10 | AC-051 | TST-044 |
 
 ## Deferred Scope
-- Everything in PRD §12 Out and §14 Future Product Scope: phone or network access, a separate view showing only one concept and its neighbors, FSRS, editing concepts inside the app, search.
-- MINOR and NOTE findings F-007, F-008 and F-009 from `docs/design/review.md`, unless a milestone touches their artifact and the fix is one line.
+- Everything in PRD §12 Out and §14 Future Product Scope: phone or network access, static exports and other layouts, FSRS, editing concepts inside the app, search across concept text, a grouped matrix.
+- NOTE findings F-007, F-008 and F-009 from `docs/design/review.md`, unless a milestone touches their artifact and the fix is one line.

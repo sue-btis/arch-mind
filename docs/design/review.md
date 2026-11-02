@@ -6,78 +6,74 @@ All enum values below stay in English, whatever language the prose uses.
 
 ## Review State
 
-- Baseline ID: `RV-002`
-- Current review mode: `follow_up`
+- Baseline ID: `RV-003`
+- Current review mode: `follow_up_verification`
 - Reconciliation cycles used: `1`
 - Maximum automatic reconciliation cycles: `3`
 - Current verdict: `Approved for build planning`
 - Escalate exit: `none`
-- Reviewed by: independent reviewer subagent (not the design author), 2026-11-01, new-baseline review of the Phase 2 change `docs/changes/2026-11-01-illustrated-study-direction/spec.md`. Diff range: `git diff development` (HEAD 2fc836c, branch `docs/illustrated-plates/Josue`) plus the untracked files (change folder, ADR-008, ADR-009). Scope: the authorities the change touches plus global contradictions. Follow-up verification of cycle 1: independent reviewer subagent, 2026-11-01, medium effort; scope = READY_FOR_VERIFICATION findings plus the cycle-1 change set.
+- Reviewed by: an independent reviewer subagent (not the design author), 2026-11-01, medium effort. It ran the new-baseline review, then a follow-up verification of reconciliation cycle 1. Diff range: `git diff` against HEAD c45a427 (branch `docs/finder-and-scale/Josue`, uncommitted) plus the untracked `ADR-010-grouped-layer-view-layout.md`, `docs/design/ux/scale-flow.mmd` and the change folder. The reviewer's rules forbid writing repository files, so the main thread saved this record from its reports.
 
 ## Mechanical Checks
 
 | Command | Result |
 |---|---|
-| `node "~/.claude/plugins/cache/changesmith/software-design-skills/1.6.0/skills/reviewing-system-design/scripts/check-package.mjs" .` | Fail, exit 1: "[mvp] FR-036 is in the MVP but in no milestone or change spec", "[mvp] FR-037 is in the MVP but in no milestone or change spec", "2 problem(s) found." See F-017 |
+| `node ".../software-design-skills/1.6.0/skills/reviewing-system-design/scripts/check-package.mjs" .` | Fail, exit 1 (follow-up): "[mvp] FR-044 … in no milestone or change spec", "[mvp] FR-049 … in no milestone or change spec", "2 problem(s) found." See F-027 |
 | Manifest `checks:` commands | None: `docs/spec/manifest.yaml` has no `checks:` key |
-| Ajv 8.20.0 draft 2020-12, `strict: true`, compile of `concept.schema.json`, `facets.schema.json`, `review-line.schema.json` | Pass: all 3 compile |
-| Ajv 8.20.0 draft 2020-12, `strict: false`, `$ref` compile of every `capture-tools.schema.json` tool input/output schema (4 tools) and `#/$defs/rejection`, plus sample instances | Pass: all 9 compile; sample instances behave as designed (pictogram pattern, `minItems: 4` catalog) |
-| `yaml@2.9.1` parse of `docs/design/api/openapi.yaml` | Pass: OpenAPI 3.1.0; includes `/api/concepts/{id}/illustration` |
+| Ajv / `yaml` parse of the data schemas, the capture contract and `openapi.yaml` | Not rerun: `git diff --name-only -- docs/design/api docs/design/data` is empty (unchanged since RV-002, where they passed) |
 | Redocly lint | Unverified: no Redocly CLI on PATH |
 | Structurizr DSL validator | Unverified: no Structurizr CLI on PATH; `architecture.dsl` checked by reading only |
-| Mermaid CLI | Unverified: not installed; `flows.mmd` and the `domain.md` state diagram read manually |
+| Mermaid CLI | Unverified: `mmdc` not installed; `scale-flow.mmd` read manually |
 | `@dbml/core` | Not applicable: persistent data is JSON Schema |
+| `docs/site/` regeneration | Not rerun; `grep` finds the new components, ADR-010 and scale-flow in `arch-mind-architecture.html` |
 
 ## Current Blocking Summary
 
 | Severity | Open | Ready for verification | Resolved | Accepted/Invalid |
 |---|---:|---:|---:|---:|
 | BLOCKER | 0 | 0 | 0 | 0 |
-| MAJOR | 0 | 0 | 2 | 0 |
-| MINOR | 0 | 0 | 5 | 1 |
-| NOTE | 3 | 0 | 3 | 0 |
+| MAJOR | 0 | 0 | 3 | 0 |
+| MINOR | 0 | 0 | 4 | 1 |
+| NOTE | 3 | 0 | 4 | 0 |
 
 ## Findings
 
 ### F-004 — Recall question ids are declared "never reused", but no component can enforce it
-
 - Severity: `MINOR`
 - Status: `ACCEPTED`
 - Origin: `BASELINE`
 - Classification: `DESIGN_GAP`
 - Owner: `docs/design/architecture/architecture.dsl` (with `docs/design/data/concept.schema.json`)
 - Related requirements: BR-006, BR-007, FR-012, FR-016
-- Evidence: carried over from RV-001. `concept.schema.json:62` "Never reused". `capture-tools.schema.json:165` continues ids "after the highest q-number in the stored file", so a hand edit that deletes the highest-numbered question lets its id, and its history, be reissued.
+- Evidence: carried over from RV-001 and RV-002. `concept.schema.json:62` "Never reused". `capture-tools.schema.json:165` continues ids "after the highest q-number in the stored file".
 - Why it matters: silent mis-scheduling in a rare edge case.
 - Required resolution: state how reuse is prevented, or record it as accepted risk.
-- Verification evidence: Accepted risk (MINOR, ledger rules allow ACCEPTED for retained debt): no design change in this cycle.
+- Verification evidence: unchanged by this baseline.
 - Routed to: —
 - Accepted by: author, 2026-10-31, «Accept recommended» (limitation L-2 in `docs/changes/2026-10-31-M04-daily-review/verification.md`); minor debt retained.
 
 ### F-007 — PD-016 and PD-017 are still open; the design has a parameterized default for each
-
 - Severity: `NOTE`
 - Status: `OPEN`
 - Origin: `BASELINE`
 - Classification: `OTHER`
 - Owner: `docs/product/prd.md`
 - Related requirements: FR-006, FR-028, FR-029
-- Evidence: carried over from RV-001. PD-016 and PD-017 are `Open` in PRD §15.
-- Why it matters: nothing blocks; the build plan should treat these as dependencies.
+- Evidence: carried over. PD-016 and PD-017 are still `Open` in PRD §15.
+- Why it matters: nothing blocks; the build plan treats these as dependencies.
 - Required resolution: none for approval.
 - Verification evidence: unchanged.
 - Routed to: —
 - Accepted by: —
 
 ### F-008 — The OpenAPI file does not state that no credentials are required
-
 - Severity: `NOTE`
 - Status: `OPEN`
 - Origin: `BASELINE`
 - Classification: `EDITORIAL`
 - Owner: `docs/design/api/openapi.yaml`
 - Related requirements: NFR-005
-- Evidence: carried over from RV-001. There is still no `security` key; the new illustration operation adds one more operation without it.
+- Evidence: carried over; `openapi.yaml` unchanged by this baseline.
 - Why it matters: the Redocly recommended ruleset fails, and the no-token decision stays implicit.
 - Required resolution: `security: []` at the root, or a Redocly config that turns the rule off intentionally.
 - Verification evidence: not rerun (no Redocly available).
@@ -85,206 +81,246 @@ All enum values below stay in English, whatever language the prose uses.
 - Accepted by: —
 
 ### F-009 — The OpenAPI `Concept` schema is only partly typed, and no 400 response is declared for invalid bodies
-
 - Severity: `NOTE`
 - Status: `OPEN`
 - Origin: `BASELINE`
 - Classification: `MINOR_INCONSISTENCY`
 - Owner: `docs/design/api/openapi.yaml`
 - Related requirements: FR-025, FR-032
-- Evidence: carried over from RV-001. `Concept` now types only `pictogram` and `hasIllustration`; the rest is a prose pointer. `POST /api/reviews` still declares no 400.
+- Evidence: carried over; unchanged.
 - Why it matters: contract tests will not check the concept shape.
 - Required resolution: `$ref` the data schema, or keep the pointer deliberately; declare 400.
-- Verification evidence: partly changed by RV-002; still open.
+- Verification evidence: unchanged.
 - Routed to: —
 - Accepted by: —
 
-### F-010 — The author cannot see a proposed visual illustration before accepting it
-
-- Severity: `MAJOR`
-- Status: `RESOLVED`
-- Origin: `BASELINE`
-- Classification: `DESIGN_GAP`
-- Owner: `docs/design/ux/flows.mmd` (with `docs/design/api/capture-tools.schema.json` and `docs/design/architecture/architecture.dsl`)
-- Related requirements: FR-035, FR-036, BR-004, PD-025, UX-004
-- Evidence: FR-035 saves the illustration only after the author accepts it; PD-025 says the author accepts, asks again or declines. `flows.mmd:17-20` has Claude Code show the proposed illustration in the conversation, which is a terminal conversation, so the author would see SVG source. No artifact defines a preview: the capture contract's 4 tools do not render or preview, the capture server has no preview component, and the only illustration endpoint serves saved concepts only.
-- Why it matters: the confirmation BR-004 and FR-035 require cannot be made meaningfully, and implementers would diverge (temp file opened unvalidated, a preview tool, a preview endpoint, a text description), some adding a contract or a trust boundary.
-- Required resolution: define how a proposed illustration is shown before acceptance (mechanism, owner, validated against the ADR-009 allowlist and shown only as an image under the same barriers); update `flows.mmd`; cover any new tool or endpoint in the contract and the threat table.
-- Verification evidence: Resolution: author decision 2026-11-01, «Browser preview tool (Recommended)». New capture tool `preview_illustration` (capture-tools.schema.json): same validator as save, temp HTML page outside the store showing the SVG only as `<img>`, opened in the default browser, no store write, works with the app closed. Recorded as an addendum to ADR-009 (decision unchanged); also `flows.mmd`, `architecture.dsl` (component `preview`), `quality-attributes.md` (threat row, NFR-002). Changed: docs/design/api/capture-tools.schema.json, docs/design/architecture/adr/ADR-009-pictogram-and-illustration-storage.md, docs/design/ux/flows.mmd, docs/design/architecture/architecture.dsl, docs/design/architecture/quality-attributes.md. Expected evidence: the tool exists in the contract with `invalid_illustration`, the flow calls it before accept, the threat table has the temp page row.
-- Routed to: —
-- Accepted by: —
-
-### F-011 — "Fits at Fit size" is undefined once Fit scales the SVG viewBox, so the FR-023 refusal trigger has no criterion
-
+### F-020 — ADR-010 labels a closed-group connection with the type instead of the count, which contradicts FR-048
 - Severity: `MAJOR`
 - Status: `RESOLVED`
 - Origin: `BASELINE`
 - Classification: `MAJOR_INCONSISTENCY`
-- Owner: `docs/design/architecture/quality-attributes.md` (NFR-001 row) with `docs/design/architecture/adr/ADR-008-layer-plates-renderer.md`
-- Related requirements: NFR-001, FR-023, FR-042
-- Evidence: `quality-attributes.md:6` sets the viewBox to the window width and refuses a view that does not fit at Fit size; a viewBox fitted to the width always fits, so the refusal can never fire without a scale or readability floor. NFR-001 asks that every pictogram and label be readable without a threshold; ADR-008 repeats "readable" with no number. The current FR-023 behavior is natural-width based (`packages/rules/fixtures/tst-032.ts:306`, M03 TST-014).
-- Why it matters: implementers would never refuse, keep a scale-1 check, or pick a minimum scale arbitrarily; FR-023, already built and tested, could silently stop working.
-- Required resolution: state the Fit scale and a measurable refusal condition; ADR-008's verification and NFR-001's milestone acceptance use it.
-- Verification evidence: Resolution: author decision 2026-11-01, «Shrink with a floor (Recommended)». Fit scale = min(1, available board width / projected width at scale 1); refusal (FR-023) when the scale is below max(11/13, 32/44) = 0.85, with base sizes labels 13 px and pictograms 44 px stated in ADR-008 (addendum and verification). Changed: docs/design/architecture/quality-attributes.md (NFR-001 row), docs/design/architecture/adr/ADR-008-layer-plates-renderer.md. Expected evidence: NFR-001 acceptance and ADR-008 verification use the 0.85 condition.
+- Owner: `docs/design/architecture/adr/ADR-010-grouped-layer-view-layout.md`
+- Related requirements: FR-048, PD-029, PD-032
+- Evidence: FR-048 (`prd.md:205-206`) "one labeled connection per pair with the number of relations it stands for"; `domain.md:33` "one connection per pair with a count". ADR-010:34 "labeled with the type when all share one, otherwise with the count", so a pair whose relations share one type shows no count. No PRD §15 row decides this.
+- Why it matters: manifest rule "Product behavior may not be changed by a technical artifact without a decided PRD §15 row"; milestone acceptance tests would differ depending on which source the implementer follows.
+- Required resolution: either ADR-010 shows the count on every connection (optionally with the type), or a PRD §15 decision amends FR-048 and `domain.md`.
+- Verification evidence: `ADR-010:34`: every edge carries the number of relations it stands for, plus their type when they all share one (FR-048); matches FR-048 (`prd.md:205`) and `domain.md:33`.
 - Routed to: —
 - Accepted by: —
 
-### F-012 — ADR-007 still decides React Flow for the layer view, with no supersession marker
+### F-021 — No behavior is defined when opening a group drops the grouped view below the 0.85 Fit floor
+- Severity: `MAJOR`
+- Status: `RESOLVED`
+- Origin: `BASELINE`
+- Classification: `DESIGN_GAP`
+- Owner: `docs/design/architecture/adr/ADR-010-grouped-layer-view-layout.md` (with the NFR-001 row of `quality-attributes.md`; PRD §15 if the visible behavior is a product choice)
+- Related requirements: NFR-001, FR-023, FR-047, FR-048
+- Evidence: ADR-010:31 "Fit may drop when a group opens". Probe check (2) at ADR-010:46 does not check Fit. The Phase 3 acceptance in `quality-attributes.md:6` covers only "every group closed". FR-048 makes opening a group unconditional; NFR-001 and FR-023 refuse any view below 0.85 (ADR-008:53).
+- Why it matters: implementers will diverge (refuse the open, replace the view with the FR-023 message, close other groups, or draw below the floor in breach of NFR-001), and each is visible product behavior.
+- Required resolution: state what happens when opening a group would take Fit below 0.85 (a PRD §15 decision if it changes what the author sees); add a Fit condition to probe check (2) and to the Phase 3 acceptance; state the same for a grouped view below 0.85 with every group closed.
+- Verification evidence: PD-035 (`prd.md:353`) and FR-049 (`prd.md:208`); `ADR-010:46` probe check (2) requires Fit ≥ 0.85 or the group kept closed; `ADR-010:49-50` addendum covers the open group and the all-closed grouped view; `quality-attributes.md:6` Phase 3 acceptance; `scale-flow.mmd:13-22`.
+- Routed to: —
+- Accepted by: —
 
+### F-022 — The FR-047 ways out for a refused matrix view are undefined, and the domain limits Focus to the layer view
+- Severity: `MAJOR`
+- Status: `RESOLVED`
+- Origin: `BASELINE`
+- Classification: `MAJOR_INCONSISTENCY`
+- Owner: `docs/design/domain.md` (with `docs/design/ux/scale-flow.mmd`; `docs/product/prd.md` if FR-045/FR-047 are narrowed)
+- Related requirements: FR-022, FR-023, FR-045, FR-047, FR-048, NFR-001
+- Evidence: FR-023 and FR-047 (`prd.md:167`, `:202-203`) apply to "a view"; FR-045 focuses "the view". The matrix is refused by width too (`DESIGN.md:227`). `domain.md:31` defines Focus as "A state of the layer view". `scale-flow.mmd` models only the layer view. PD-029 keeps a grouped matrix in future scope.
+- Why it matters: from a refused matrix, implementers could offer only narrower filters (breaks FR-047), add a focused matrix (contradicts `domain.md:31`), or switch to the Layers view (stated nowhere).
+- Required resolution: state in the domain and the flow what each choice does when the refused view is the matrix, or narrow FR-045/FR-047 through a PRD §15 row.
+- Verification evidence: PD-036 (`prd.md:354`) and FR-047 (`prd.md:202`); `domain.md:31` (focus from a refused matrix opens the layer view) and `:33`; `scale-flow.mmd:5,7,9,11` matrix branch.
+- Routed to: —
+- Accepted by: —
+
+### F-023 — ADR-010 relies on an "ADR-008 Amendment 1" and ADR-008 invariants that ADR-008 does not contain
 - Severity: `MINOR`
 - Status: `RESOLVED`
 - Origin: `BASELINE`
 - Classification: `MINOR_INCONSISTENCY`
-- Owner: `docs/design/architecture/adr/ADR-007-ui-foundation.md`
-- Related requirements: UX-001, FR-019
-- Evidence: ADR-007:11 and :39 keep React Flow for the layer view with status `Accepted`; ADR-008:38 removes React Flow; `quality-attributes.md:61` forbids `@xyflow/react`.
-- Why it matters: a reader of ADR-007 alone gets the opposite instruction; ADR-008 and the rule make intent clear, hence MINOR.
-- Required resolution: ADR-007 carries "Partially superseded by: ADR-008 (layer view drawing)".
-- Verification evidence: Resolution: ADR-007 now carries "Partially superseded by: ADR-008 (layer view drawing)". Changed: docs/design/architecture/adr/ADR-007-ui-foundation.md.
+- Owner: `docs/design/architecture/adr/ADR-008-layer-plates-renderer.md` (with ADR-010 and the `layout` component of `architecture.dsl`)
+- Related requirements: FR-048, NFR-001, FR-019
+- Evidence: ADR-010:47 cites "ADR-008 Amendment 1"; ADR-008 has only the Fit addendum. The one-graph, elk-routes-all decision is M05 Amendment 1 (`docs/changes/2026-11-01-M05-layer-plates/spec.md:35`). ADR-008:22,25 and `architecture.dsl:12` still describe a per-layer layout. The scene invariants cited by ADR-010:13,19 and `quality-attributes.md:66` live in `DESIGN.md:233` and the M05 tests.
+- Why it matters: a reader following ADR-010's references finds no authority for the invariants its probe tests.
+- Required resolution: record M05 Amendment 1 and the scene invariants in ADR-008 (addendum) or `quality-attributes.md`; correct the ADR-010 reference and the `layout` component description.
+- Verification evidence: `ADR-008:52-60` addendum "One elk graph" with the M05 Amendment 1 quote (matches `docs/changes/2026-11-01-M05-layer-plates/spec.md:35`) and the scene invariants; `ADR-010:46-47`, `architecture.dsl:12` and `quality-attributes.md:66` cite it.
 - Routed to: —
 - Accepted by: —
 
-### F-013 — PRD §12 Out and §14 still exclude a "focus view (a concept and its neighbors)", while FR-039 to FR-041 bring the neighbourhood forward
-
+### F-024 — ADR-008 and DESIGN.md still say the refusal only suggests narrower filters
 - Severity: `MINOR`
 - Status: `RESOLVED`
 - Origin: `BASELINE`
 - Classification: `MINOR_INCONSISTENCY`
-- Owner: `docs/product/prd.md`
-- Related requirements: FR-039, FR-040, FR-041, PD-020, PD-021
-- Evidence: §12 Out "Focus view (a concept and its neighbors)"; §14 "Focus view starting from one concept"; FR-039 highlights the neighbourhood in place; `quality-attributes.md:20` speaks of "selection and focus".
-- Why it matters: the Out item reads as excluding exactly what FR-039 to FR-041 add.
-- Required resolution: narrow the Out and §14 items to a separate view showing only one concept and its neighbors.
-- Verification evidence: Resolution: PRD §12 Out and §14 narrowed to "a separate view showing only one concept and its neighbors" (editorial; behavior decided by FR-039 to FR-041, PD-021). Changed: docs/product/prd.md.
-- Routed to: —
+- Owner: `docs/design/architecture/adr/ADR-008-layer-plates-renderer.md`
+- Related requirements: FR-023, FR-047, PD-031
+- Evidence: ADR-008:53 "suggests narrower filters". `DESIGN.md:227` and `DESIGN.md:164` ("Deferred … the Ctrl K finder and legend type isolation") predate the amendment.
+- Why it matters: DESIGN.md wording is what the UI milestone reads; it is not a manifest authority and the spec defers DESIGN.md changes to the milestones.
+- Required resolution: update ADR-008:53 to FR-047; route the DESIGN.md fit-message and "Deferred" updates to the Phase 3 milestones.
+- Verification evidence: `ADR-008:62` offers the FR-047 ways out. `DESIGN.md:164` and `:227` remain stale and are routed to the Phase 3 milestones.
+- Routed to: `writing-build-plan` (Phase 3 milestones update `DESIGN.md:164` and `DESIGN.md:227`)
 - Accepted by: —
 
-### F-014 — Load-time handling of BR-008 cases in hand-edited files is unspecified
-
-- Severity: `MINOR`
-- Status: `RESOLVED`
-- Origin: `BASELINE`
-- Classification: `MINOR_INCONSISTENCY`
-- Owner: `docs/design/architecture/adr/ADR-009-pictogram-and-illustration-storage.md` (with `docs/design/domain.md`)
-- Related requirements: BR-008, FR-017, FR-036, FR-038
-- Evidence: `domain.md:139` reports hand edits that break BR-008, while `domain.md:82` and FR-038 fall back silently for an unknown pictogram id; ADR-009:32 does not say whether two links fail the load; `capture-tools.schema.json:84,148` leave "has an illustration" undefined for a broken link.
-- Why it matters: rules-module behavior differs at the edges; a second link next to a broken one would break BR-008.
-- Required resolution: for unknown pictogram id, more than one link, and a link with a missing or invalid SVG, state whether the concept loads, whether it is listed in `problems`, and whether `extend_concept` returns `already_present` or replaces the link.
-- Verification evidence: Resolution: one rule in ADR-009 and domain.md. Unknown pictogram id, more than one illustration link, and a link to a missing or invalid SVG all load the concept (layer pictogram / illustration treated as absent) and list it in `problems` with the reason. `extend_concept` with an illustration on a concept with any link, even a broken one, answers `already_present` (a capture never replaces; the author repairs by hand). `hasIllustration` is true only for exactly one valid link. Changed: docs/design/architecture/adr/ADR-009-pictogram-and-illustration-storage.md, docs/design/domain.md, docs/design/api/capture-tools.schema.json, docs/design/api/openapi.yaml.
-- Routed to: —
-- Accepted by: —
-
-### F-015 — The NFR-002 design response does not account for the pictogram and illustration proposals
-
-- Severity: `MINOR`
-- Status: `RESOLVED`
-- Origin: `BASELINE`
-- Classification: `COVERAGE_GAP`
-- Owner: `docs/design/architecture/quality-attributes.md`
-- Related requirements: NFR-002, FR-034, FR-035
-- Evidence: the NFR-002 row is unchanged; illustration SVG is generated for the proposal and again as the save argument, and each retry adds a generation; NFR-002 was never measured (DQ-006).
-- Why it matters: the 60-second budget may be consumed by SVG generation.
-- Required resolution: the NFR-002 response and evidence state that the 5 timed captures include a pictogram proposal and an illustration proposal (or record a tradeoff).
-- Verification evidence: Resolution: NFR-002 response counts one `preview_illustration` call per illustration proposal; evidence says the 5 timed captures include a pictogram proposal and an illustration proposal with one preview. Changed: docs/design/architecture/quality-attributes.md.
-- Routed to: —
-- Accepted by: —
-
-### F-016 — How the UI shows the image link inside the Illustration text is unspecified
-
+### F-025 — Finder scope and the legend filter combined with a selection are undefined
 - Severity: `MINOR`
 - Status: `RESOLVED`
 - Origin: `BASELINE`
 - Classification: `DESIGN_GAP`
-- Owner: `docs/design/api/openapi.yaml` (with ADR-009)
-- Related requirements: FR-025, UX-004, NFR-004
-- Evidence: `concept.schema.json:24` keeps the Markdown link inside `seeI.illustration`; the HTTP `Concept` returns that shape; no artifact says whether the API strips the link or the UI replaces it with the illustration endpoint image.
-- Why it matters: implementations differ in what the detail shows.
-- Required resolution: state whether `seeI.illustration` reaches the UI with or without the link, and that the image is shown only through the illustration endpoint.
-- Verification evidence: Resolution: the API returns `seeI.illustration` without the Markdown image link (stripped server-side) plus `hasIllustration`; the UI shows the image only through `GET /api/concepts/{id}/illustration`. Changed: docs/design/api/openapi.yaml, docs/design/architecture/adr/ADR-009-pictogram-and-illustration-storage.md.
+- Owner: `docs/design/domain.md` (with `docs/design/ux/scale-flow.mmd`)
+- Related requirements: FR-043, FR-044, FR-039, FR-041
+- Evidence: FR-043 makes the chosen concept the selection. `domain.md:34` does not say whether the finder searches the whole store or only the shown concepts, nor what happens to a filtered-out choice. FR-044 and the selection both make things recede; no artifact defines them together. `scale-flow.mmd` reaches the finder and legend only from the layer view at Fit.
+- Why it matters: small but visible differences between implementations.
+- Required resolution: state the finder's search set and its effect on filters, and how the legend filter and a selection combine; record a §15 row if it is a product choice.
+- Verification evidence: PD-037 (`prd.md:355`) and FR-043 (`prd.md:190`); `domain.md:34` (Finder) and `:35` (Legend type filter intersects with the selection); `scale-flow.mmd:26-29`.
 - Routed to: —
 - Accepted by: —
 
-### F-017 — check-package: FR-036 and FR-037 are in no milestone, because the Phase 2 plan is written after approval
+### F-026 — Direction of grouped connections and links between an open and a closed group are undefined
+- Severity: `MINOR`
+- Status: `RESOLVED`
+- Origin: `BASELINE`
+- Classification: `DESIGN_GAP`
+- Owner: `docs/design/architecture/adr/ADR-010-grouped-layer-view-layout.md`
+- Related requirements: FR-020, FR-048
+- Evidence: FR-020 draws directed arrows; FR-048, `domain.md:33` and ADR-010:34 say "one connection per pair" without saying whether pairs are ordered, or how a relation between a concept in an open group and a closed group is drawn.
+- Why it matters: affects the edge model handed to elk and the counts shown.
+- Required resolution: state whether pairs are directed, and how a concept-to-closed-group relation is drawn and counted.
+- Verification evidence: `ADR-010:34`: A → B and B → A are separate edges (FR-020); concept-to-closed-group edges counted the same way; `domain.md:33`.
+- Routed to: —
+- Accepted by: —
 
+### F-027 — check-package: FR-044 is in no milestone, because the Phase 3 plan is written after approval
 - Severity: `NOTE`
 - Status: `RESOLVED`
 - Origin: `BASELINE`
 - Classification: `OTHER`
 - Owner: `docs/build/plan.md`
-- Related requirements: FR-034 to FR-042
-- Evidence: the check-package output above; PRD §12 places Phase 2 before `### Out`, so the script counts it as MVP; the change spec writes Phase 2 milestones after approval; the rule "No React Flow in the UI" fails against current code (`packages/ui/package.json` `@xyflow/react`) until the plates milestone lands.
+- Related requirements: FR-023, FR-043 to FR-048, BR-009
+- Evidence: check-package after reconciliation cycle 1 reports "[mvp] FR-044 is in the MVP but in no milestone or change spec" and "[mvp] FR-049 is in the MVP but in no milestone or change spec". PRD §12 places Phase 3 before `### Out`, so the script counts it as MVP; it matches IDs literally (`check-package.mjs:165`). Same workflow pattern as F-017 in RV-002.
 - Why it matters: workflow order, not a design defect.
-- Required resolution: `writing-build-plan` adds Phase 2 milestones covering FR-034 to FR-042 by literal ID, with React Flow removal in the plates milestone; rerun check-package.
-- Verification evidence: —
-- Routed to: —
+- Required resolution: `writing-build-plan` adds Phase 3 milestones citing FR-023, FR-043, FR-044, FR-045, FR-046, FR-047, FR-048, FR-049 and BR-009 each by ID; rerun check-package.
+- Verification evidence: `docs/build/plan.md` milestones M08 to M10 cite FR-023, FR-043 to FR-049 and BR-009, with coverage matrix rows; check-package reports "Package checks passed." (main thread, 2026-11-01, mechanical check)
+- Routed to: `writing-build-plan`
 - Accepted by: —
 
-### F-018 — SVG allowlist hardening: no DOCTYPE/entity rule and no size cap
-
+### F-028 — The persistent schema and the capture contract do not say that domain order matters
 - Severity: `NOTE`
 - Status: `RESOLVED`
 - Origin: `BASELINE`
 - Classification: `OTHER`
-- Owner: `docs/design/architecture/adr/ADR-009-pictogram-and-illustration-storage.md`
-- Related requirements: NFR-006, BR-008
-- Evidence: ADR-009:34 lists script, event handlers, external references and `foreignObject`, not DOCTYPE or entities; `illustrationSvg` has no `maxLength`; the rules module re-parses every SVG on each reload.
-- Why it matters: optional hardening against entity expansion or oversized input.
-- Required resolution: optionally add "no DOCTYPE or entity declarations" and a size cap.
-- Verification evidence: Resolution: allowlist adds no DOCTYPE or entity declarations and a 200,000-character cap; `maxLength: 200000` on `illustrationSvg`; threat row updated. Changed: docs/design/architecture/adr/ADR-009-pictogram-and-illustration-storage.md, docs/design/api/capture-tools.schema.json, docs/design/architecture/quality-attributes.md.
+- Owner: `docs/design/data/concept.schema.json` (with `docs/design/api/capture-tools.schema.json`)
+- Related requirements: BR-009, PD-033, FR-006
+- Evidence: `domain.md:50` "The order of its domains is meaningful". `concept.schema.json:14` and `capture-tools.schema.json:157` are silent. No contradiction: arrays are ordered and nothing in `packages` sorts domains.
+- Why it matters: a capture that proposes domains in catalog order decides the author's grouping without the author knowing.
+- Required resolution: optionally state in both descriptions that the first domain is the group (BR-009) and that order is preserved.
+- Verification evidence: `concept.schema.json:14` and `capture-tools.schema.json:157` state that order is preserved and the first domain is the group (BR-009); both parse.
 - Routed to: —
 - Accepted by: —
 
-### F-019 — No rule keeps the pictogram catalog and the pictogram artwork in step
+### F-029 — The PD-029 quote does not show that "B zoom semántico" is the grouped layer view, or that the grouped matrix was declined
+- Severity: `NOTE`
+- Status: `RESOLVED`
+- Origin: `BASELINE`
+- Classification: `EDITORIAL`
+- Owner: `docs/product/prd.md`
+- Related requirements: FR-048, §14
+- Evidence: the PD-029 quote names the chosen options only; the option list is not recorded.
+- Why it matters: a later reader cannot check the decision against the quote.
+- Required resolution: optionally list the options offered (A to D) in the row or the change folder.
+- Verification evidence: PD-029 (`prd.md:348`) lists options A to D and states that C stays future scope.
+- Routed to: —
+- Accepted by: —
 
+### F-030 — No relationship connects the plates renderer to the navigation and grouping components
 - Severity: `NOTE`
 - Status: `RESOLVED`
 - Origin: `BASELINE`
 - Classification: `OTHER`
-- Owner: `docs/design/architecture/quality-attributes.md`
-- Related requirements: FR-037, FR-038, BR-008
-- Evidence: ADR-009:31 puts the catalog in the rules package and the artwork in a UI asset; no architecture rule checks that every catalog id has artwork, including the four layer pictograms.
-- Why it matters: a catalog id without artwork would be accepted at capture and drawn inconsistently.
-- Required resolution: optionally add an architecture rule with a check.
-- Verification evidence: Resolution: architecture rule added "every catalog pictogram id has artwork; the four layer pictogram ids exist" with a test check. Changed: docs/design/architecture/quality-attributes.md.
+- Owner: `docs/design/architecture/architecture.dsl`
+- Related requirements: FR-045, FR-048
+- Evidence: `architecture.dsl:55-56` add only `navigation -> selection` and `grouping -> layout`.
+- Why it matters: the dependency direction of the new components is implicit.
+- Required resolution: optionally add the relationships.
+- Verification evidence: `architecture.dsl:57-59` adds plates → navigation, navigation → grouping, plates → grouping (read only; no Structurizr CLI).
 - Routed to: —
 - Accepted by: —
 
 ## Cycle History
 
-### New baseline RV-002 — cycle 0
+### New baseline RV-003 — cycle 0
+- Opened by: the Phase 3 change `docs/changes/2026-11-01-finder-and-scale/spec.md`, after RV-002 was approved.
+- Carried over from RV-002: F-004 (MINOR, `ACCEPTED`), F-007, F-008, F-009 (NOTE, `OPEN`).
+- Resolved in RV-002 and dropped from this ledger: F-010 to F-019.
+- BLOCKER open: `0`; MAJOR open: `3` (F-020, F-021, F-022); MINOR open: `4` (F-023 to F-026); NOTE open: `7` (F-007, F-008, F-009, F-027 to F-030).
+- Verdict: `Needs design revision`.
 
-- Opened by: the Phase 2 change `docs/changes/2026-11-01-illustrated-study-direction/spec.md`.
-- Carried over from RV-001: F-004 (MINOR), F-007, F-008, F-009 (NOTE), all `OPEN`.
-- Resolved since RV-001 and dropped from this ledger: F-005 (`domain.md:71` day rule) and F-006 (`architecture.dsl` `storeConfig` container).
-- BLOCKER open: `0`
-- MAJOR open: `2`
-- MINOR open: `6`
-- NOTE open: `6`
-- Verdict: `Needs design revision`
+Checked with no finding:
+- NG-003: the grouped view and focus are offered only from the would-not-fit message, so they are not "the main way to explore".
+- §12 Out vs FR-045: the "separate view showing only one concept" item is removed from Out and §14; "other layouts" reads as views other than the layer and matrix views.
+- Search in §12 Out is limited to concept text, with FR-043 carved out.
+- BR-003: four fixed layers preserved.
+- BR-009 vs `concept.schema.json` `domains`: ordered, `uniqueItems`, no `minItems`, so the "No domain" group can occur.
+- PD-011 is compatible with PD-031.
+- PD-028, PD-030 to PD-034: quotes match, traced in §12 and §16.
+- ADR-010 is `Accepted` with an "Accepted by" quote; reversibility stated.
+- The non-persistence rule for focus, grouping, the finder and the legend filter is consistent with `domain.md:31`.
+- NFR-001 acceptance in the PRD matches the Phase 3 evidence in `quality-attributes.md:6`.
 
-Checked with no finding: ADR statuses and supersession for ADR-006/008/009; PD-021 to PD-027 decided and traced; schemas and tool contracts compile; NFR-003 write order; illustration referenced only by the Markdown link; `extend_concept` appending the link under FR-036/BR-004/BR-005; SVG trust boundary (allowlist at save and load, `<img>` only, CSP and `nosniff`, id-derived path); selection transient and never stored; plates width at Fit deferred to the milestone with an ADR-008 revisit trigger.
+### Reconciliation cycle 1 (main thread, 2026-11-01)
+- Author decisions taken for this cycle, recorded in PRD §15:
+  - PD-035 «Uno abierto a la vez (Recommended)» (F-021);
+  - PD-036 «Llevan a capas (Recommended)» (F-022);
+  - PD-037 «Todo el store (Recommended)» (F-025).
+- Change set:
+  - `docs/product/prd.md`:
+    - FR-043: every concept in the store; a hidden choice clears the filters (PD-037);
+    - FR-047: from a refused matrix, filters keep the matrix, while focus and grouping open the layer view (PD-036);
+    - FR-049 added: one open group, and a group that would not fit stays closed (PD-035);
+    - Phase 3 cites FR-045 to FR-049;
+    - PD-029 lists the options offered (F-029);
+    - PD-035 to PD-037 added;
+    - §16 updated.
+  - `ADR-010`:
+    - connections are directed, one per ordered pair, and always carry their count, plus the type when shared (F-020, F-026);
+    - concept-to-closed-group edges;
+    - probe check 2 includes Fit or stays closed;
+    - addendum for the open group and the grouped-view floor, quoting PD-035 (F-021);
+    - reference corrected to the ADR-008 addendum (F-023).
+  - `ADR-008`:
+    - addendum "One elk graph", recording M05 Amendment 1 with its quote and the scene invariants (F-023);
+    - refusal now offers the FR-047 ways out (F-024).
+  - `architecture.dsl`: `layout` description; plates → navigation, navigation → grouping and plates → grouping relationships (F-023, F-030).
+  - `domain.md`:
+    - Focus from the matrix opens the layer view (F-022);
+    - Group: one open at a time;
+    - Grouped layer view: directed counted connections;
+    - Finder: the whole store, clears hiding filters (F-025);
+    - new term "Legend type filter", which intersects with the selection (F-025).
+  - `docs/design/ux/scale-flow.mmd`: matrix branch, grouped-view floor, single open group, finder over the whole store, legend with a selection (F-021, F-022, F-025).
+  - `quality-attributes.md`: Phase 3 acceptance adds the single-group Fit condition; the rule cites the ADR-008 addendum (F-021, F-023).
+  - `concept.schema.json` and `capture-tools.schema.json`: domain order preserved, first domain is the group (F-028).
+  - `docs/site/` regenerated.
+- F-024 DESIGN.md parts (fit-message wording, "Deferred" line) are routed to the Phase 3 milestones, as the finding allows.
+- Checks:
+  - check-package reports FR-044 and FR-049 in no milestone (F-027, routed to `writing-build-plan`);
+  - both JSON schemas parse;
+  - `pnpm --filter @arch-mind/rules test` 78/78;
+  - `pnpm --filter @arch-mind/capture test` 17/17.
+- Expected verification evidence: each READY_FOR_VERIFICATION finding's required resolution is met in the paths above, with no new contradiction.
 
-### Reconciliation — cycle 1
-
-- Run by: `reconciling-system-design`, 2026-11-01. Author decisions: F-010 «Browser preview tool (Recommended)», F-011 «Shrink with a floor (Recommended)». F-004 carried as accepted by the author on 2026-10-31 («Accept recommended»).
-- Attempted, now `READY_FOR_VERIFICATION`: F-010, F-011 (MAJOR); F-012, F-013, F-014, F-015, F-016 (MINOR); F-018, F-019 (NOTE). `ACCEPTED`: F-004. Left `OPEN` by instruction: F-007, F-008, F-009, F-017.
-- Change set: `docs/design/api/capture-tools.schema.json` (tool `preview_illustration`, `maxLength`, DOCTYPE/size rule, broken-link semantics); `docs/design/api/openapi.yaml` (problems cases, link stripped from `seeI.illustration`); `docs/design/architecture/adr/ADR-007-ui-foundation.md` (supersession line); `docs/design/architecture/adr/ADR-008-layer-plates-renderer.md` (base sizes, Fit scale, 0.85 floor, addendum); `docs/design/architecture/adr/ADR-009-pictogram-and-illustration-storage.md` (allowlist hardening, hand-edit rules, API link stripping, preview addendum); `docs/design/architecture/architecture.dsl` (component `preview`); `docs/design/architecture/quality-attributes.md` (NFR-001, NFR-002, threat rows, architecture rule); `docs/design/domain.md` (load rules); `docs/design/ux/flows.mmd` (preview before acceptance); `docs/product/prd.md` (§12 Out, §14 wording, PD-021); `docs/spec/manifest.yaml` (status).
-- Expected verification: the follow-up review checks each READY_FOR_VERIFICATION finding against the evidence recorded in the finding, and reruns `check-package.mjs` (F-017 remains).
-- Reconciliation cycles used after this pass: `1` of `3`.
-
-### Follow-up — cycle 1
-
-- Reconciliation change set: as listed under "Reconciliation — cycle 1".
-- Checks rerun 2026-11-01: check-package exits 1 with only the expected F-017 problems (FR-036, FR-037); Ajv 8.20.0 strict + ajv-formats compiles the data schemas; Ajv strict:false with the data schemas registered compiles all 5 capture tools (incl. `preview_illustration`) and all 11 `$defs`; `yaml@2.9.1` parses `openapi.yaml` (OpenAPI 3.1.0, 6 paths). Redocly, Structurizr and Mermaid remain unverified (not installed).
-- Findings verified RESOLVED: F-010 (`capture-tools.schema.json:118-138`, `flows.mmd` preview block, `architecture.dsl` component `preview`, temp-page threat row, ADR-009:58-62); F-011 (NFR-001 row and ADR-008:53-54, Fit scale and 0.85 floor); F-012 (ADR-007:7); F-013 (PRD §12 Out, §14); F-014 (ADR-009:35, `domain.md`, `capture-tools.schema.json:85,170`, `openapi.yaml`); F-015 (`quality-attributes.md:7`); F-016 (`openapi.yaml` Concept, ADR-009:36,55); F-018 (ADR-009:34,53, `capture-tools.schema.json:15`); F-019 (architecture rule with test check).
-- F-004 ACCEPTED (author, 2026-10-31, «Accept recommended», M04 limitation L-2). F-007, F-008, F-009, F-017 OPEN (NOTE); F-017 is resolved by the Phase 2 build plan.
-- New regressions: none
-- Critical new blockers: none
-- BLOCKER open: `0`
-- MAJOR open: `0`
-- Previous BLOCKER+MAJOR open: `2`
-- Current BLOCKER+MAJOR open: `0`
-- Consecutive increases: `0`
-- Verdict: `Approved for build planning`
-- Observations for the build plan (not ledger findings): the NFR-002 prompt budget with `preview_illustration` (pre-allow it and check interactively in the capture milestone); ADR-009:54 groups the unknown-pictogram case with "extend_concept with an illustration answers already_present", while the Decision at ADR-009:35 governs (no link means an illustration is accepted).
-- F-017 RESOLVED 2026-11-01: `docs/build/plan.md` adds M05 to M07 covering FR-034 to FR-042 by literal ID, with React Flow removal in M05 (TST-024); `check-package.mjs` now prints "Package checks passed."
+### Follow-up verification after reconciliation cycle 1 (2026-11-01)
+- Verified by an independent reviewer subagent at medium effort.
+- Resolved: F-020, F-021, F-022 (MAJOR); F-023, F-024, F-025, F-026 (MINOR); F-028, F-029, F-030 (NOTE).
+- F-024's DESIGN.md parts (`DESIGN.md:164`, `:227`) are routed to `writing-build-plan` for the Phase 3 milestones.
+- Still open: F-007, F-008, F-009 and F-027 (NOTE). F-027 is routed to `writing-build-plan`; check-package reports FR-044 and FR-049.
+- Regressions: none. CRITICAL_NEW: none. Unresolved BLOCKER + MAJOR: 3 → 0.
+- PRD edits FR-043, FR-047 and FR-049 are authorized by PD-037, PD-036 and PD-035. The reviewer could not check the quotes against the author's messages: they come from the author's answers in the session that ran this change.
+- Non-blocking observations for the Phase 3 milestone specs:
+  - the grouped view refused with every group closed offers two choices, while FR-047 says three;
+  - the finder may clear filters into a refused view, "the filters" could mean all filters or only the hiding facets, and the finder inside a closed group is not stated;
+  - the ADR-008 addendum invariant list is a subset of `DESIGN.md:233` (it omits the 35 px plate-edge run and the 10 px lane spacing);
+  - the `Study UI` container description at `architecture.dsl:11` still says it lays out each layer.
+- Verdict: `Approved for build planning`; manifest `status: approved`.

@@ -164,7 +164,7 @@ Hovering or tapping a relation in any view shows its source and the author's exp
 The matrix view shows the matching concepts as rows and columns, with the relation type in the cell where the source row meets the target column.
 
 ### FR-023
-When the matching concepts would not fit the reference screen (NFR-001), the app says so and suggests narrower filters instead of drawing a view that needs sideways scrolling.
+When the matching concepts would not fit the reference screen (NFR-001), the app says so instead of drawing a view that needs sideways scrolling, and offers the ways out in FR-047.
 
 ### FR-024
 Selecting a concept in any view opens its detail beside the view without hiding the selected concept.
@@ -186,6 +186,27 @@ The author can clear the selection, which restores every concept and relation to
 
 ### FR-042
 The author can zoom the layer view in and return it to a size that fits the screen width.
+
+### FR-043
+The author can open a finder from the keyboard, type part of a concept's title or designator, and choose a match among every concept in the store; the chosen concept becomes the selection and is brought into view, and when the filters hide it they are cleared so it can be shown. The finder does not search concept text.
+
+### FR-044
+Choosing a relation type in the wire legend keeps relations of that type prominent and makes the others recede; choosing it again restores every relation.
+
+### FR-045
+The author can focus the view on the selected concept, which then shows only that concept, its incoming and outgoing relations and the concepts they connect; leaving focus restores the filtered view.
+
+### FR-046
+A facet group whose values do not fit the filters without scrolling offers a field that narrows the values shown to those matching what the author types; values already chosen stay visible.
+
+### FR-047
+When a view would not fit (FR-023), the message offers three ways out, and the app takes none of them on its own: narrower filters, focusing on a concept (FR-045), or grouping the layer view by domain (FR-048). When the refused view is the matrix, narrower filters keep the matrix, while focusing or grouping opens the layer view focused or grouped.
+
+### FR-048
+In the grouped layer view each plate shows one group per domain with its concept count, and relations between groups are shown as one labeled connection per pair with the number of relations it stands for; opening a group shows its concepts and their relations in place.
+
+### FR-049
+Only one group is open at a time: opening a group closes the one that was open. A group whose concepts would not fit when opened (NFR-001) stays closed, and the app says so and offers focusing on one of its concepts or narrower filters.
 
 ### Concept detail
 ### FR-025
@@ -215,7 +236,7 @@ Every review is kept in history with the question, date and result.
 
 ## 8. Non-Functional Requirements
 ### NFR-001 — View readability
-Reference screen: a desktop browser window of 1366 × 768 px at 100 % zoom. Every view the app draws fits the window width with no horizontal scrolling; for the layer view this holds at its fit size (FR-042), and zooming in is the author's choice. Acceptance: the 13-concept, 15-relation TST-032 chain from `docs/discovery/spikes/DQ-005-view-layouts/` renders as a layer view at fit size and as a matrix view, each without horizontal scrolling, with every pictogram and label readable. Discovery found no evidence for a maximum node count (DQ-003), so none is set.
+Reference screen: a desktop browser window of 1366 × 768 px at 100 % zoom. Every view the app draws fits the window width with no horizontal scrolling; for the layer view this holds at its fit size (FR-042), and zooming in is the author's choice. Acceptance: the 13-concept, 15-relation TST-032 chain from `docs/discovery/spikes/DQ-005-view-layouts/` renders as a layer view at fit size and as a matrix view, each without horizontal scrolling, with every pictogram and label readable. A set of concepts that the layer view refuses (FR-023) renders without horizontal scrolling both focused on one of its concepts (FR-045) and grouped by domain (FR-048). Discovery found no evidence for a maximum node count (DQ-003), so none is set.
 
 ### NFR-002 — Capture friction
 Excluding the time the author spends writing (SEE-I, explanations, choices), one capture adds at most 60 seconds of waiting and at most 2 confirmation prompts in the Claude Code session. Measured on 5 real captures with up to 3 relations each. Not yet measured: discovery timed only the save itself (DQ-006).
@@ -241,6 +262,7 @@ With 300 concepts and 600 recall questions, the review screen shows the due ques
 - BR-006 — Each recall question is in exactly one Leitner box and has one due date.
 - BR-007 — Review history is append-only: past reviews are never rewritten.
 - BR-008 — A concept has at most one pictogram and at most one visual illustration; the pictogram comes from the pictogram library.
+- BR-009 — In the grouped layer view a concept belongs to exactly one group: its first listed domain, or a "No domain" group when it has none.
 
 ## 10. Product / UX Principles
 - UX-001 — Views look like arch-mind's own design, with layers as stacked plates; generic diagram styling is not acceptable for the layer view.
@@ -268,12 +290,17 @@ With 300 concepts and 600 recall questions, the review screen shows the due ques
 - FR-019, FR-024, FR-025 as amended, FR-037 to FR-042 — Layer plates with pictograms, a selection that brings the neighbourhood forward, navigable relations and zoom to fit.
 - BR-008, UX-001 as amended, UX-004.
 
+### Phase 3 — Navigation at scale
+- FR-043, FR-044 — Finder by title or designator, and the wire legend as a relation-type filter.
+- FR-023 as amended, FR-045 to FR-049 — Focus on a concept, searchable facet filters, and a layer view grouped by domain, offered when a view would not fit.
+- BR-009.
+
 ### Out
 - Phone or network access.
-- A separate view showing only one concept and its neighbors, static exports, other layouts.
+- Static exports, other layouts.
 - FSRS or other adaptive scheduling.
 - Editing concepts inside the app (hand edits to files and capture cover changes).
-- Search across concept text.
+- Search across concept text (finding a concept by title or designator is in scope, FR-043).
 
 ## 13. Success Criteria
 - SC-001 — After 8 weeks of use, the author has captured at least 30 concepts from real project sessions.
@@ -284,7 +311,7 @@ With 300 concepts and 600 recall questions, the review screen shows the due ques
 ## 14. Future Product Scope
 - Review from a phone.
 - Adaptive scheduling (FSRS) using the kept review history.
-- A separate view showing only one concept and its neighbors.
+- A matrix view grouped by layer or domain, with collapsible groups.
 - Editing concepts inside the app.
 
 ## 15. Product Decisions
@@ -317,12 +344,22 @@ With 300 concepts and 600 recall questions, the review screen shows the due ques
 | PD-027 | Do the layer plates replace the flat layer view? | Decided | Yes: plates, matrix and review; the flat layer view is retired | author | 2026-11-01 | «Plates replace it (Recommended)» | FR-019, UX-001, `docs/design/architecture/adr/ADR-006-layer-view-layout.md` |
 | PD-016 | Leitner box count and intervals | Open | Discovery used 5 boxes of 1, 3, 7, 16 and 35 days as an example, not a researched value. Authority: author | — | — | — | FR-028, FR-029 |
 | PD-017 | Who maintains the facet lists (layers are fixed; domains and concerns)? | Open | Whether the author can add domains and concerns during capture or only in a settings file. Authority: author | — | — | — | FR-006 |
+| PD-028 | What does the finder search? | Decided | Concept titles and designators only; concept text stays out of scope | author | 2026-11-01 | «Título y designador (Recommended)» (verbatim, Spanish) | FR-043, §12 Out |
+| PD-029 | Which ways of handling views that do not fit join the requirements now (offered: A focus on a concept, B layer view grouped by domain, called semantic zoom, C grouped matrix, D searchable facet filters)? | Decided | A, B and D; C, the grouped matrix, stays future scope | author | 2026-11-01 | «A modo foco (Recommended),D filtros con búsqueda (Recommended),B zoom semántico» (verbatim, Spanish) | FR-045, FR-046, FR-048, §14 |
+| PD-030 | How far does focus reach? | Decided | One step: the concept, its relations and the concepts they connect | author | 2026-11-01 | «1 salto (Recommended)» (verbatim, Spanish) | FR-045 |
+| PD-031 | What does the app do when a view would not fit? | Decided | It says so and offers the ways out; it never switches on its own | author | 2026-11-01 | «Pide filtrar y ofrece foco (Recommended)» (verbatim, Spanish) | FR-023, FR-047 |
+| PD-032 | When is the layer view grouped by domain? | Decided | Only when the author chooses it from the would-not-fit message | author | 2026-11-01 | «Solo si no cabe (Recommended)» (verbatim, Spanish) | FR-047, FR-048 |
+| PD-033 | Which group holds a concept with several domains? | Decided | Its first listed domain, so each concept appears once | author | 2026-11-01 | «Su primer domain (Recommended)» (verbatim, Spanish) | BR-009 |
+| PD-035 | What happens when opening a group would make the grouped view not fit? | Decided | One group open at a time; a group that would not fit alone stays closed and the app offers focus or narrower filters | author | 2026-11-01 | «Uno abierto a la vez (Recommended)» (verbatim, Spanish) | FR-049, review RV-003 F-021 |
+| PD-036 | Which ways out does a refused matrix view offer? | Decided | Narrower filters keep the matrix; focus and grouping open the layer view focused or grouped | author | 2026-11-01 | «Llevan a capas (Recommended)» (verbatim, Spanish) | FR-047, review RV-003 F-022 |
+| PD-037 | Which concepts does the finder search? | Decided | Every concept in the store; choosing one hidden by the filters clears them | author | 2026-11-01 | «Todo el store (Recommended)» (verbatim, Spanish) | FR-043, review RV-003 F-025 |
+| PD-034 | When do the finder, legend filter and scaling options enter the product? | Decided | In one PRD amendment after M06 | author | 2026-11-01 | «Después de M06 (Recommended)» (verbatim, Spanish) and «Yes, add them» | FR-043 to FR-049, §12 |
 
 ## 16. Product Traceability
 | Capability / Journey | Requirements |
 |---|---|
 | CAP-001 / J-001 | FR-001 to FR-014, FR-033, FR-034 to FR-036, NFR-002, NFR-003, BR-001, BR-002, BR-004, BR-005, BR-008 |
 | CAP-002 | FR-015 to FR-017, NFR-003, NFR-004, BR-002 |
-| CAP-003 / J-002 | FR-018 to FR-024, FR-037 to FR-042, NFR-001, UX-001, UX-004 |
+| CAP-003 / J-002 | FR-018 to FR-024, FR-037 to FR-049, NFR-001, UX-001, UX-004, BR-009 |
 | CAP-004 / J-002, J-003 | FR-025, FR-031, FR-040 |
 | CAP-005 / J-003 | FR-026 to FR-032, NFR-006, BR-006, BR-007, UX-002 |
