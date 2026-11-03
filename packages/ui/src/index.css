@@ -169,6 +169,10 @@ body {
 }
 
 .sh { stroke-width: 1.75; }
+.hv { stroke-width: 2.5; }
+@media (prefers-color-scheme: dark) {
+  .hv { stroke: var(--ft); }
+}
 .lnl { stroke: var(--ft); stroke-width: 1.5; }
 .dash { stroke-dasharray: 3 3; }
 .dk { fill: var(--obj-line); }
@@ -556,4 +560,18 @@ td {
   @keyframes fade-out {
     to { opacity: 0; }
   }
+}
+
+/* The illustration sits beside its text and wraps under it when the drawer is narrow; it is an <img>, so its SVG can never run script. */
+.illustration-part { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0.75rem; }
+.illustration-part > p { flex: 1 1 9rem; min-width: 0; }
+.illustration-img {
+  display: block;
+  flex: 0 1 11rem;
+  width: 11rem;
+  max-height: 11rem;
+  object-fit: contain;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #fff;
 }

@@ -61,9 +61,9 @@ afterAll(async () => {
 });
 
 describe("capture server contract (TST-003, AC-3, AC-4)", () => {
-  it("publishes the four capture tools with schemas that accept contract-valid arguments", async () => {
+  it("publishes the five capture tools with schemas that accept contract-valid arguments", async () => {
     const { tools } = await client.listTools();
-    expect(tools.map((t) => t.name).sort()).toEqual(["extend_concept", "get_concept", "list_concepts", "save_concept"]);
+    expect(tools.map((t) => t.name).sort()).toEqual(["extend_concept", "get_concept", "list_concepts", "preview_illustration", "save_concept"]);
     const save = tools.find((t) => t.name === "save_concept")!;
     const published = ajv.compile(save.inputSchema as object);
     expect(published(complete())).toBe(true);

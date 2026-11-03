@@ -1,7 +1,10 @@
+import { illustrationLinks } from "./illustration.ts";
+import { validateSvg } from "./svg-allowlist.ts";
 import {
   ID_PATTERN,
   LAYERS,
   SEE_I_PARTS,
+  isPictogramId,
   type Concept,
   type Facets,
   type RejectionRule,
@@ -82,8 +85,9 @@ export interface SaveContext {
   facets: Pick<Facets, "domains" | "concerns">;
 }
 
-const CONCEPT_KEYS = ["id", "title", "layer", "domains", "concerns", "seeI", "relations", "episodes", "recall"];
-const STORED_KEYS = [...CONCEPT_KEYS, "pictogram"];
+const STORED_KEYS = ["id", "title", "layer", "pictogram", "domains", "concerns", "seeI", "relations", "episodes", "recall"];
+// The SVG itself is input only: a stored concept keeps just the link inside its Illustration part.
+const CONCEPT_KEYS = [...STORED_KEYS, "illustration"];
 const RELATION_KEYS = ["type", "to", "source", "explanation"];
 
 export function validateNewConcept(input: unknown, ctx: SaveContext): RuleError[] {
@@ -115,6 +119,11 @@ export function validateNewConcept(input: unknown, ctx: SaveContext): RuleError[
     if (isBlank(seeI[part])) add(`/seeI/${part}`, "incomplete_see_i", `SEE-I ${part} is missing or empty`);
   }
   checkSeeIText(seeI, add);
+  if (typeof seeI.illustration === "string" && illustrationLinks(seeI.illustration).length > 0) {
+    add("/seeI/illustration", "invalid_shape", "must not contain a Markdown image link; the server adds it when an illustration is saved");
+  }
+  checkPictogram(input.pictogram, add);
+  checkIllustration(input.illustration, add);
 
   checkNewRelations(input.relations, input.id, ctx, add);
   checkEpisodes(input.episodes, add);
@@ -124,6 +133,31 @@ export function validateNewConcept(input: unknown, ctx: SaveContext): RuleError[
   } else {
     checkNewRecall(input.recall, add);
   }
+  return errors;
+}
+
+function checkPictogram(value: unknown, add: Add) {
+  if (value === undefined) return;
+  if (typeof value !== "string") return add("/pictogram", "invalid_shape", "must be a catalog pictogram id");
+  if (!isPictogramId(value)) add("/pictogram", "unknown_pictogram", `"${value}" is not in the pictogram catalog`);
+}
+
+function checkIllustration(value: unknown, add: Add) {
+  if (value === undefined) return;
+  if (typeof value !== "string") return add("/illustration", "invalid_shape", "must be SVG text");
+  for (const reason of validateSvg(value)) add("/illustration", "invalid_illustration", reason);
+}
+
+export function validatePreview(input: unknown): RuleError[] {
+  const { errors, add } = collector();
+  if (!isObject(input)) {
+    add("", "invalid_shape", "arguments must be an object");
+    return errors;
+  }
+  rejectUnknownKeys(input, ["id", "illustration"], "", add);
+  if (!isId(input.id)) add("/id", "invalid_shape", "must be a lowercase kebab-case id");
+  if (input.illustration === undefined) add("/illustration", "invalid_shape", "is required");
+  else checkIllustration(input.illustration, add);
   return errors;
 }
 
@@ -140,7 +174,7 @@ export interface ExtendContext {
   existingIds: ReadonlySet<string>;
 }
 
-const EXTEND_KEYS = ["id", "relations", "episodes", "recall"];
+const EXTEND_KEYS = ["id", "pictogram", "illustration", "relations", "episodes", "recall"];
 
 export function validateExtension(input: unknown, ctx: ExtendContext): RuleError[] {
   const { errors, add } = collector();
@@ -160,8 +194,22 @@ export function validateExtension(input: unknown, ctx: ExtendContext): RuleError
     else add("/recall", "invalid_shape", "must be an array");
   }
 
-  const hasItems = ["relations", "episodes", "recall"].some((k) => Array.isArray(input[k]) && input[k].length > 0);
-  if (!hasItems) add("", "nothing_to_add", "add at least one relation, episode or recall question");
+  // A link counts even when its SVG is broken: the author repairs it by hand (ADR-009).
+  const present = {
+    pictogram: ctx.stored.pictogram !== undefined,
+    illustration: illustrationLinks(ctx.stored.seeI.illustration).length > 0,
+  };
+  for (const key of ["pictogram", "illustration"] as const) {
+    if (input[key] !== undefined && present[key]) add(`/${key}`, "already_present", `the concept already has a ${key}; extend never replaces`);
+  }
+  if (input.pictogram !== undefined && !present.pictogram) checkPictogram(input.pictogram, add);
+  if (input.illustration !== undefined && !present.illustration) checkIllustration(input.illustration, add);
+
+  const hasItems =
+    ["relations", "episodes", "recall"].some((k) => Array.isArray(input[k]) && input[k].length > 0) ||
+    input.pictogram !== undefined ||
+    input.illustration !== undefined;
+  if (!hasItems) add("", "nothing_to_add", "add at least one relation, episode, recall question, pictogram or illustration");
   return errors;
 }
 

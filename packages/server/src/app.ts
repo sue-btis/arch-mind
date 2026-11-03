@@ -2,7 +2,17 @@ import { readFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { extname, join, normalize, sep } from "node:path";
-import { LAYERS, loadConceptDetail, loadConcepts, loadDueQuestions, loadFacets, parseReviewRequest, recordReview } from "@arch-mind/rules";
+import {
+  LAYERS,
+  loadConceptDetail,
+  loadConcepts,
+  loadDueQuestions,
+  loadFacets,
+  loadIllustration,
+  parseReviewRequest,
+  recordReview,
+  withoutIllustrationLink,
+} from "@arch-mind/rules";
 import { checkRequest } from "./guard.ts";
 
 export interface RunningServer {
@@ -24,6 +34,17 @@ const contentTypes: Record<string, string> = {
 function sendJson(res: ServerResponse, status: number, body: unknown) {
   res.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
   res.end(JSON.stringify(body));
+}
+
+// A second barrier if the illustration URL is opened directly: the UI only ever shows it through an <img> (ADR-009).
+function sendSvg(res: ServerResponse, svg: string) {
+  res.writeHead(200, {
+    "Content-Type": "image/svg+xml",
+    "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+    "X-Content-Type-Options": "nosniff",
+    "Cache-Control": "no-store",
+  });
+  res.end(svg);
 }
 
 const MAX_BODY_BYTES = 16 * 1024;
@@ -70,16 +91,26 @@ export async function startServer(options: { storePath: string; uiDir: string; p
     try {
       if (path === "/api/concepts" || path === "/api/facets") {
         if (!readOnly) return sendJson(res, 405, { error: "Method not allowed" });
-        if (path === "/api/concepts") return sendJson(res, 200, await loadConcepts(storePath));
+        if (path === "/api/concepts") {
+          const { concepts, problems } = await loadConcepts(storePath);
+          return sendJson(res, 200, { concepts: concepts.map(withoutIllustrationLink), problems });
+        }
         const { domains, concerns } = await loadFacets(storePath);
         return sendJson(res, 200, { layers: LAYERS, domains, concerns });
+      }
+      const illustrationId = /^\/api\/concepts\/([^/]+)\/illustration$/.exec(path)?.[1];
+      if (illustrationId !== undefined) {
+        if (!readOnly) return sendJson(res, 405, { error: "Method not allowed" });
+        const illustration = await loadIllustration(storePath, illustrationId);
+        if (!illustration.ok) return sendJson(res, 404, { error: "No illustration" });
+        return sendSvg(res, illustration.svg);
       }
       const detailId = /^\/api\/concepts\/([^/]+)$/.exec(path)?.[1];
       if (detailId !== undefined) {
         if (!readOnly) return sendJson(res, 405, { error: "Method not allowed" });
         const detail = await loadConceptDetail(storePath, detailId);
         if (!detail.ok) return sendJson(res, 404, { error: detail.errors[0]!.message });
-        return sendJson(res, 200, { concept: detail.concept, questions: detail.questions });
+        return sendJson(res, 200, { concept: withoutIllustrationLink(detail.concept), questions: detail.questions });
       }
       if (path === "/api/reviews/due") {
         if (!readOnly) return sendJson(res, 405, { error: "Method not allowed" });

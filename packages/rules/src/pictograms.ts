@@ -23,6 +23,16 @@ export const PICTOGRAMS: readonly Pictogram[] = [
   { id: "signed-document", meaning: "A page signed by its own author: a document vouched for by its signer." },
   { id: "header-filter", meaning: "A header sheet with a funnel: a response header that filters what may load." },
   { id: "terminal-play", meaning: "A terminal with a play button: a server running in production mode." },
+  { id: "database", meaning: "A cylinder with a table card: a database that keeps records between requests." },
+  { id: "message-queue", meaning: "A belt carrying envelopes toward an arrow: messages waiting their turn to be handled." },
+  { id: "background-worker", meaning: "A turning gear: a process that does work outside the request that asked for it." },
+  { id: "mutex-lock", meaning: "A padlock with a keyhole: a lock that only one holder can take at a time." },
+  { id: "encryption-key", meaning: "A key lying flat: the secret that locks and unlocks encrypted data." },
+  { id: "cache", meaning: "A chip with a bolt: a fast copy of data kept close to where it is used." },
+  { id: "plugin-module", meaning: "A block hovering over a socket: a module that plugs into a host without changing it." },
+  { id: "tenant-building", meaning: "A tall building beside a smaller one: separate tenants sharing one system." },
+  { id: "rate-gauge", meaning: "A dial with a needle: a limit on how many requests arrive per period." },
+  { id: "gateway", meaning: "A wall with an arched opening: the single entry point that every request passes through." },
 ];
 
 const IDS: ReadonlySet<string> = new Set(PICTOGRAMS.map((p) => p.id));
