@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { parseConcept, serializeConcept } from "./concept-file.ts";
+import { appendIllustrationLink, inspectIllustration, readValidSvg, writeIllustrationAtomic } from "./illustration.ts";
 import { ID_PATTERN, SEE_I_PARTS, isPictogramId, type Concept, type Facets, type FileProblem, type RuleError } from "./model.ts";
 import { validateExtension, validateNewConcept } from "./validate.ts";
 
@@ -139,8 +140,11 @@ async function readConceptFile(storePath: string, name: string): Promise<Concept
   return structuredClone(await parsing);
 }
 
-// Derived on every read and never stored (concept.schema.json has no such key); no illustration can be valid before the illustration validator exists.
-export const withDerived = (concept: Concept): Concept => ({ ...concept, hasIllustration: false });
+// Derived on every read and never stored (concept.schema.json has no such key).
+export async function withDerived(storePath: string, concept: Concept): Promise<{ concept: Concept; problem?: string }> {
+  const state = await inspectIllustration(storePath, concept);
+  return { concept: { ...concept, hasIllustration: state.ok }, ...(!state.ok && state.problem !== undefined && { problem: state.problem }) };
+}
 
 export async function loadConcepts(storePath: string): Promise<{ concepts: Concept[]; problems: FileProblem[] }> {
   const concepts: Concept[] = [];
@@ -151,7 +155,9 @@ export async function loadConcepts(storePath: string): Promise<{ concepts: Conce
   for (const name of names) {
     try {
       const concept = await readConceptFile(storePath, name);
-      concepts.push(withDerived(concept));
+      const derived = await withDerived(storePath, concept);
+      concepts.push(derived.concept);
+      if (derived.problem !== undefined) problems.push({ file: name, reason: derived.problem });
       if (concept.pictogram !== undefined && !isPictogramId(concept.pictogram)) {
         problems.push({ file: name, reason: `unknown pictogram "${concept.pictogram}"; the concept is drawn with its layer pictogram` });
       }
@@ -217,15 +223,27 @@ export function replaceConceptAtomic(
 export interface SaveOptions {
   today?: string;
   beforeRename?: () => void | Promise<void>;
+  // Runs after the illustration is written and before the concept file is, so tests can stop a save between the two writes.
+  afterIllustration?: () => void | Promise<void>;
 }
 
 export type SaveOutcome =
-  | { ok: true; id: string; file: string; recall: { id: string; confirmed: string }[] }
+  | { ok: true; id: string; file: string; illustrationFile?: string; recall: { id: string; confirmed: string }[] }
   | { ok: false; errors: RuleError[] };
 
 export function localDate(date: Date = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+// The link is added to the concept only here, and the SVG is written before the concept file: an interrupted save can leave
+// an orphan SVG but never a concept pointing to a missing file (ADR-009).
+async function writeIllustrationFirst(storePath: string, concept: Concept, svg: string | undefined, options: SaveOptions): Promise<string | undefined> {
+  if (svg === undefined) return undefined;
+  concept.seeI = { ...concept.seeI, illustration: appendIllustrationLink(concept.seeI.illustration, concept.id, concept.title) };
+  const file = await writeIllustrationAtomic(storePath, concept.id, svg);
+  await options.afterIllustration?.();
+  return file;
 }
 
 export async function saveConcept(storePath: string, input: unknown, options: SaveOptions = {}): Promise<SaveOutcome> {
@@ -241,6 +259,7 @@ export async function saveConcept(storePath: string, input: unknown, options: Sa
   if (errors.length > 0) return { ok: false, errors };
 
   const draft = input as Omit<Concept, "recall" | "episodes"> & {
+    illustration?: string;
     recall: { question: string }[];
     episodes?: Concept["episodes"];
   };
@@ -251,6 +270,7 @@ export async function saveConcept(storePath: string, input: unknown, options: Sa
     id: draft.id,
     title: draft.title,
     layer: draft.layer,
+    ...(draft.pictogram !== undefined && { pictogram: draft.pictogram }),
     domains: draft.domains,
     concerns: draft.concerns,
     seeI,
@@ -260,8 +280,15 @@ export async function saveConcept(storePath: string, input: unknown, options: Sa
   };
 
   try {
+    const illustrationFile = await writeIllustrationFirst(storePath, concept, draft.illustration, options);
     const file = await writeConceptAtomic(storePath, concept, options.beforeRename);
-    return { ok: true, id: concept.id, file, recall: recall.map(({ id, confirmed }) => ({ id, confirmed })) };
+    return {
+      ok: true,
+      id: concept.id,
+      file,
+      ...(illustrationFile !== undefined && { illustrationFile }),
+      recall: recall.map(({ id, confirmed }) => ({ id, confirmed })),
+    };
   } catch (error) {
     if (error instanceof DuplicateIdError) {
       return {
@@ -303,6 +330,8 @@ export async function extendConcept(storePath: string, input: unknown, options: 
   if (errors.length > 0) return { ok: false, errors };
 
   const added = input as {
+    pictogram?: string;
+    illustration?: string;
     relations?: Concept["relations"];
     episodes?: Concept["episodes"];
     recall?: { question: string }[];
@@ -312,10 +341,20 @@ export async function extendConcept(storePath: string, input: unknown, options: 
   const recall = (added.recall ?? []).map((q, i) => ({ id: `q${lastQ + i + 1}`, question: q.question, confirmed }));
   const merged: Concept = {
     ...stored,
+    ...(added.pictogram !== undefined && { pictogram: added.pictogram }),
     relations: [...stored.relations, ...(added.relations ?? [])],
     episodes: [...stored.episodes, ...(added.episodes ?? [])],
     recall: [...stored.recall, ...recall],
   };
+  const illustrationFile = await writeIllustrationFirst(storePath, merged, added.illustration, options);
   const file = await replaceConceptAtomic(storePath, merged, options.beforeRename);
-  return { ok: true, id: merged.id, file, recall: recall.map(({ id, confirmed }) => ({ id, confirmed })) };
+  return { ok: true, id: merged.id, file, ...(illustrationFile !== undefined && { illustrationFile }), recall: recall.map(({ id, confirmed }) => ({ id, confirmed })) };
+}
+
+export async function loadIllustration(storePath: string, id: unknown): Promise<{ ok: true; svg: string } | { ok: false }> {
+  const loaded = await loadConcept(storePath, id);
+  if (!loaded.ok) return { ok: false };
+  // The link rules and the SVG are both checked, as in loadConcepts, so the endpoint serves what hasIllustration reports.
+  const state = await inspectIllustration(storePath, loaded.concept);
+  return state.ok ? readValidSvg(storePath, loaded.concept.id) : { ok: false };
 }

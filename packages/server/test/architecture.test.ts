@@ -51,7 +51,7 @@ describe("architecture rules", () => {
           const names = named ? named[1]!.split(",").map((n) => n.trim().split(/\s+as\s+/)[0]!).filter(Boolean) : [];
           if (!named || names.some((n) => !readers.has(n))) offenders.push(`${relative(packagesDir, file)}: ${m[0]}`);
         }
-        if (/\bsetupStore\b|\bsaveConcept\b|\bwriteConceptAtomic\b|\breplaceConceptAtomic\b|\bextendConcept\b/.test(text) && !file.endsWith("cli.ts")) {
+        if (/\bsetupStore\b|\bsaveConcept\b|\bwriteConceptAtomic\b|\breplaceConceptAtomic\b|\bextendConcept\b|\bwriteIllustrationAtomic\b/.test(text) && !file.endsWith("cli.ts")) {
           offenders.push(`${relative(packagesDir, file)} (calls a rules writer)`);
         }
         if (/\bappendReviewLine\b|\brecordReview\b/.test(text) && !file.endsWith("app.ts")) {
@@ -93,6 +93,48 @@ describe("architecture rules", () => {
     expect(new Set(symbols).size).toBe(symbols.length);
     expect([...symbols].sort()).toEqual([...catalog].sort());
     for (const layer of LAYERS) expect(symbols).toContain(layer);
+  });
+
+  it("TST-031: only the rules writers touch illustrations/, and the SVG is written before the concept file", () => {
+    const writing = packages
+      .flatMap((pkg) => sourceFiles(join(packagesDir, pkg, "src")))
+      .filter((f) => /\bwriteIllustrationAtomic\b/.test(readFileSync(f, "utf8")))
+      .map((f) => relative(packagesDir, f).replaceAll("\\", "/"))
+      .sort();
+    expect(writing).toEqual(["rules/src/illustration.ts", "rules/src/store.ts"]);
+
+    const illustrationSource = readFileSync(join(packagesDir, "rules", "src", "illustration.ts"), "utf8");
+    expect(illustrationSource.match(/(?<![.\w])(writeFile|rename|appendFile|truncate)\(/g)).toEqual(["rename("]);
+
+    const storeSource = readFileSync(join(packagesDir, "rules", "src", "store.ts"), "utf8");
+    const save = storeSource.slice(storeSource.indexOf("export async function saveConcept"), storeSource.indexOf("export type LoadOneOutcome"));
+    expect(save.indexOf("writeIllustrationFirst(")).toBeGreaterThan(-1);
+    expect(save.indexOf("writeIllustrationFirst(")).toBeLessThan(save.indexOf("writeConceptAtomic("));
+    const extend = storeSource.slice(storeSource.indexOf("export async function extendConcept"), storeSource.indexOf("export async function loadIllustration"));
+    expect(extend.indexOf("writeIllustrationFirst(")).toBeLessThan(extend.indexOf("replaceConceptAtomic("));
+
+    for (const pkg of ["server", "ui"]) {
+      for (const file of sourceFiles(join(packagesDir, pkg, "src"))) {
+        expect(readFileSync(file, "utf8"), file).not.toMatch(/\b(writeFile|rename|mkdir|copyFile|createWriteStream)\b/);
+      }
+    }
+  });
+
+  it("TST-034: the UI never injects SVG text into the DOM and reaches an illustration only through an img", () => {
+    const injectors = /dangerouslySetInnerHTML|\binnerHTML\b|\bouterHTML\b|insertAdjacentHTML|DOMParser|createContextualFragment|document\.write|srcdoc|<object\b|<embed\b|<iframe\b/;
+    expect(injectors.test("<div dangerouslySetInnerHTML={{ __html: svg }} />")).toBe(true);
+    const offenders: string[] = [];
+    const illustrationUrls: string[] = [];
+    for (const file of sourceFiles(join(packagesDir, "ui", "src"))) {
+      const text = readFileSync(file, "utf8");
+      const name = relative(packagesDir, file).replaceAll("\\", "/");
+      if (injectors.test(text)) offenders.push(name);
+      if (/fetch\s*\([^)]*illustration/.test(text)) offenders.push(`${name} (fetches the illustration as data)`);
+      for (const m of text.matchAll(/src=\{`[^`]*\/illustration`\}/g)) illustrationUrls.push(`${name}: ${m[0]}`);
+      if (/\/illustration`/.test(text) && !/<img[\s\S]{0,200}\/illustration`/.test(text)) offenders.push(`${name} (illustration URL outside an img)`);
+    }
+    expect(offenders).toEqual([]);
+    expect(illustrationUrls).toHaveLength(1);
   });
 
   it("TST-039: the finder, legend filter, focus, facet search, grouping and prominence modules never write or keep state outside memory", () => {

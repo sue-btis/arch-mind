@@ -78,7 +78,8 @@ export async function loadConceptDetail(storePath: string, id: unknown): Promise
   const loaded = await loadConcept(storePath, id);
   if (!loaded.ok) return loaded;
   const [{ leitnerIntervalsDays }, lines] = await Promise.all([loadFacets(storePath), loadReviewLines(storePath)]);
-  return { ok: true, concept: withDerived(loaded.concept), questions: replayQuestionStates(loaded.concept, lines, leitnerIntervalsDays) };
+  const { concept } = await withDerived(storePath, loaded.concept);
+  return { ok: true, concept, questions: replayQuestionStates(loaded.concept, lines, leitnerIntervalsDays) };
 }
 
 // Append mode and one write per line. Only the last byte is read, so a hand-edited log without a final newline

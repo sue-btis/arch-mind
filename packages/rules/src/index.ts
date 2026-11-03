@@ -1,6 +1,8 @@
 export * from "./model.ts";
+export { MAX_SVG_CHARS, validateSvg } from "./svg-allowlist.ts";
+export { stripIllustrationLinks, withoutIllustrationLink } from "./illustration.ts";
 export { parseConcept, serializeConcept } from "./concept-file.ts";
-export { validateExtension, validateNewConcept, validateStoredShape, type ExtendContext, type SaveContext } from "./validate.ts";
+export { validateExtension, validateNewConcept, validatePreview, validateStoredShape, type ExtendContext, type SaveContext } from "./validate.ts";
 export {
   StoreError,
   configFilePath,
@@ -9,6 +11,7 @@ export {
   loadConcept,
   loadConcepts,
   loadFacets,
+  loadIllustration,
   localDate,
   replaceConceptAtomic,
   saveConcept,

@@ -163,7 +163,19 @@ export function ConceptDetail({
             {SEE_I_PARTS.map((part) => (
               <div key={part} className="mb-2 last:mb-0">
                 <p className="font-medium">{SEE_I_LABELS[part]}</p>
-                <p className="whitespace-pre-wrap">{concept.seeI[part]}</p>
+                {part === "illustration" && concept.hasIllustration ? (
+                  <div className="illustration-part">
+                    <p className="whitespace-pre-wrap">{concept.seeI[part]}</p>
+                    <img
+                      className="illustration-img"
+                      data-testid="concept-illustration"
+                      src={`/api/concepts/${encodeURIComponent(concept.id)}/illustration`}
+                      alt={concept.seeI.illustration.replace(/\s+/g, " ").trim() || `Illustration of ${concept.title}`}
+                    />
+                  </div>
+                ) : (
+                  <p className="whitespace-pre-wrap">{concept.seeI[part]}</p>
+                )}
               </div>
             ))}
           </section>
