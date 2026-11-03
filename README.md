@@ -48,11 +48,16 @@ The allowed domains and concerns are the lists in `facets.yaml`; edit them to fi
 
 ## Capture a concept
 
-Start Claude Code in any project with the plugin loaded:
+Install the plugin once from your clone; the repository is its own plugin marketplace:
 
 ```bash
-claude --plugin-dir /path/to/arch-mind/packages/capture
+claude plugin marketplace add /path/to/arch-mind
+claude plugin install arch-mind@arch-mind
 ```
+
+From then on every Claude Code session loads it, in any project. Add the marketplace from the local folder, not from GitHub: a local marketplace loads the plugin in place, with the `dist/` you built, while a GitHub install would clone the repository without it. After pulling changes and running `pnpm build` again, start a new session (or run `/reload-plugins`).
+
+To try it for one session without installing, use `claude --plugin-dir /path/to/arch-mind/packages/capture` instead.
 
 When a concept comes up, ask Claude to capture it, for example *"capture the `__Host-` cookie prefix as a concept"*. The `capture-concept` skill then:
 
@@ -115,7 +120,7 @@ The product and design documents live in `docs/`: the brief and PRD in `docs/pro
 
 ## Status
 
-arch-mind 0.1 is a personal, single-user tool and the planned milestones are complete. Still open: the Leitner box count and intervals are a provisional default (`facets.yaml`, `leitnerIntervalsDays`), and there is no plugin marketplace entry yet, so the plugin is loaded with `--plugin-dir`.
+arch-mind 0.1 is a personal, single-user tool and the planned milestones are complete. Still open: the Leitner box count and intervals are a provisional default (`facets.yaml`, `leitnerIntervalsDays`), and the plugin installs only from a local, built clone, not directly from GitHub.
 
 ## License
 
