@@ -2,5 +2,6 @@
   "name": "arch-mind",
   "displayName": "arch-mind",
   "version": "0.1.0",
+  "author": { "name": "sue-btis" },
   "description": "Capture architecture concepts from a Claude Code conversation into the arch-mind store."
 }

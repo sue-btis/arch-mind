@@ -1,0 +1,12 @@
+{
+  "name": "arch-mind",
+  "owner": { "name": "sue-btis" },
+  "description": "The arch-mind capture plugin, installed from a local, built clone.",
+  "plugins": [
+    {
+      "name": "arch-mind",
+      "source": "./packages/capture",
+      "description": "Capture architecture concepts from a Claude Code conversation into the arch-mind store."
+    }
+  ]
+}
